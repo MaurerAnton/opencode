@@ -30,6 +30,9 @@ jobs:
       - name: Build CLI for linux-arm64
         run: ./packages/opencode/script/build.ts --single --skip-embed-web-ui
 
+      - name: Install packaging tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libarchive-tools zstd
+
       - name: Bundle Arch Linux package
         run: |
           BIN="packages/opencode/dist/opencode-linux-arm64/bin/opencode"
