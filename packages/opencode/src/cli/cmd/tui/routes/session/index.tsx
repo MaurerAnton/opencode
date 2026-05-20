@@ -50,6 +50,7 @@ import type { TaskTool } from "@/tool/task"
 import type { QuestionTool } from "@/tool/question"
 import type { SkillTool } from "@/tool/skill"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
+import { addDefaultParsers, BoxRenderable, RGBA, ScrollBoxRenderable, TextAttributes } from "@opentui/core"
 import { useSDK } from "@tui/context/sdk"
 import { useEditorContext } from "@tui/context/editor"
 import type { DialogContext } from "@tui/ui/dialog"
@@ -90,8 +91,6 @@ import { getRevertDiffFiles } from "../../util/revert-diff"
 import { useCommandPalette } from "../../context/command-palette"
 import { useBindings, useCommandShortcut } from "../../keymap"
 import { PathFormatterProvider, usePathFormatter } from "../../context/path-format"
-
-addDefaultParsers(parsers.parsers)
 
 const GO_UPSELL_FREE_TIER_LAST_SEEN_AT = "go_upsell_last_seen_at"
 const GO_UPSELL_FREE_TIER_DONT_SHOW = "go_upsell_dont_show"
@@ -182,6 +181,8 @@ function use() {
 }
 
 export function Session() {
+  addDefaultParsers(parsers.parsers)
+
   const route = useRouteData("session")
   const { navigate } = useRoute()
   const sync = useSync()
