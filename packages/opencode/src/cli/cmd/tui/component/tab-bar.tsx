@@ -33,8 +33,8 @@ export function TabBar() {
       <box flexDirection="row" flexShrink={0} marginBottom={1}>
         <For each={tabs()}>
           {(id) => {
-            const isActive = id === active()
-            const isHover = id === hoverTab()
+            const isActive = () => id === active()
+            const isHover = () => id === hoverTab()
             return (
               <box
                 flexDirection="row"
@@ -43,18 +43,18 @@ export function TabBar() {
                 paddingBottom={0}
                 paddingLeft={2}
                 paddingRight={2}
-                border={isActive ? ["top"] : undefined}
-                borderColor={isActive ? theme.primary : theme.background}
-                backgroundColor={!isActive && isHover ? theme.backgroundMenu : theme.background}
+                border={isActive() ? ["top"] : undefined}
+                borderColor={isActive() ? theme.primary : theme.background}
+                backgroundColor={!isActive() && isHover() ? theme.backgroundMenu : theme.background}
                 onMouseOver={() => setHoverTab(id)}
                 onMouseOut={() => setHoverTab(undefined)}
                 onMouseUp={() => {
                   if (renderer.getSelection()?.getSelectedText()) return
-                  if (!isActive) local.session.openTab(id)
+                  if (!isActive()) local.session.openTab(id)
                 }}
               >
-                <text fg={isActive ? theme.primary : theme.textMuted} wrapMode="none">
-                  {isActive ? "● " : "○ "}
+                <text fg={isActive() ? theme.primary : theme.textMuted} wrapMode="none">
+                  {isActive() ? "● " : "○ "}
                   {title(id)} ×
                 </text>
               </box>
