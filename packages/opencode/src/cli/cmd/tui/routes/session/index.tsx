@@ -148,6 +148,8 @@ const sessionBindingCommands = [
   "messages.copy",
   "session.copy",
   "session.export",
+  "session.cycle_recent",
+  "session.cycle_recent_reverse",
   "session.child.first",
   "session.parent",
   "session.child.next",
@@ -977,6 +979,35 @@ export function Session() {
           }
         } catch {
           toast.show({ message: "Failed to export session", variant: "error" })
+        }
+        dialog.clear()
+      },
+    },
+    {
+      title: "Cycle to previous recent session",
+      value: "session.cycle_recent",
+      category: "Session",
+      hidden: true,
+      run: () => {
+        const parentID = session()?.parentID
+        if (parentID) {
+          navigate({ type: "session", sessionID: parentID })
+        } else {
+          local.session.cycleRecent(1)
+        }
+        dialog.clear()
+      },
+    },
+    {
+      title: "Cycle to next recent session",
+      value: "session.cycle_recent_reverse",
+      category: "Session",
+      hidden: true,
+      run: () => {
+        if (children().length > 1) {
+          moveFirstChild()
+        } else {
+          local.session.cycleRecent(-1)
         }
         dialog.clear()
       },

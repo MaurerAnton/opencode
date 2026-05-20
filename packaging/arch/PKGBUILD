@@ -1,0 +1,25 @@
+# Maintainer: MaurerAnton <open-code@maurer.pw>
+# Contributor: opencode
+pkgname=opencode-bin
+pkgver=1.14.48
+pkgrel=1
+pkgdesc="AI-powered development tool"
+arch=('x86_64' 'aarch64')
+url="https://github.com/anomalyco/opencode"
+license=('MIT')
+depends=('glibc')
+
+_arch_map() {
+  case "${CARCH}" in
+    x86_64) echo "x64" ;;
+    aarch64) echo "arm64" ;;
+  esac
+}
+
+source=("https://github.com/MaurerAnton/opencode/releases/download/v${pkgver}/opencode-linux-$(_arch_map).tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  install -Dm755 "${srcdir}/opencode" "${pkgdir}/usr/bin/opencode"
+  install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
