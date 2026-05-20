@@ -33,8 +33,8 @@ export function TabBar() {
       <box flexDirection="row" flexShrink={0} marginBottom={1}>
         <For each={tabs()}>
           {(id) => {
-            const isActive = () => id === active()
-            const isHover = () => id === hoverTab()
+            const isActive = createMemo(() => id === active())
+            const isHover = createMemo(() => id === hoverTab())
             return (
               <box
                 flexDirection="row"
