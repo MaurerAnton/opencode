@@ -1,11 +1,10 @@
 import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
+import DESCRIPTION from "./browser.txt"
 import { $ } from "bun"
 import { readFile, unlink } from "fs/promises"
 import { tmpdir } from "os"
 import { join } from "path"
-
-const DESCRIPTION = await Bun.file(new URL("./browser.txt", import.meta.url)).text()
 
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to take a screenshot of" }),
