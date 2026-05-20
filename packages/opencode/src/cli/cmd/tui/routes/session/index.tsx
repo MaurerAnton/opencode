@@ -7,6 +7,7 @@ import {
   For,
   Match,
   on,
+  onCleanup,
   onMount,
   Show,
   Switch,
@@ -132,6 +133,7 @@ const sessionBindingCommands = [
   "session.toggle.timestamps",
   "session.toggle.thinking",
   "session.toggle.actions",
+  "session.toggle.expand",
   "session.toggle.scrollbar",
   "session.toggle.generic_tool_output",
   "session.page.up",
@@ -168,6 +170,7 @@ const context = createContext<{
   providers: () => ReadonlyMap<string, Provider>
   sync: ReturnType<typeof useSync>
   tui: ReturnType<typeof useTuiConfig>
+  expandToggleSet: Set<() => void>
 }>()
 
 function use() {
@@ -225,6 +228,8 @@ export function Session() {
   const [diffWrapMode] = kv.signal<"word" | "none">("diff_wrap_mode", "word")
   const [_animationsEnabled, _setAnimationsEnabled] = kv.signal("animations_enabled", true)
   const [showGenericToolOutput, setShowGenericToolOutput] = kv.signal("generic_tool_output_visibility", false)
+  const expandToggleSet = new Set<() => void>()
+  const toggleExpandAll = () => expandToggleSet.forEach((fn) => fn())
 
   const wide = createMemo(() => dimensions().width > 120)
   const sidebarVisible = createMemo(() => {
@@ -708,6 +713,16 @@ export function Session() {
       },
     },
     {
+      title: "Expand or collapse tool outputs",
+      value: "session.toggle.expand",
+      category: "Session",
+      hidden: true,
+      run: () => {
+        toggleExpandAll()
+        dialog.clear()
+      },
+    },
+    {
       title: "Toggle session scrollbar",
       value: "session.toggle.scrollbar",
       category: "Session",
@@ -1126,6 +1141,7 @@ export function Session() {
           providers,
           sync,
           tui: tuiConfig,
+          expandToggleSet,
         }}
       >
         <box flexDirection="row" flexGrow={1} minHeight={0}>
@@ -1705,6 +1721,12 @@ function GenericTool(props: ToolProps<any>) {
     return [...lines().slice(0, maxLines), "…"].join("\n")
   })
 
+  createEffect(() => {
+    const toggle = () => setExpanded((prev) => !prev)
+    if (overflow()) ctx.expandToggleSet.add(toggle)
+    onCleanup(() => ctx.expandToggleSet.delete(toggle))
+  })
+
   return (
     <Show
       when={props.output && ctx.showGenericToolOutput()}
@@ -1871,6 +1893,7 @@ function BlockTool(props: {
 
 function Shell(props: ToolProps<typeof ShellTool>) {
   const { theme } = useTheme()
+  const ctx = use()
   const pathFormatter = usePathFormatter()
   const isRunning = createMemo(() => props.part.state.status === "running")
   const output = createMemo(() => stripAnsi(props.metadata.output?.trim() ?? ""))
@@ -1880,6 +1903,12 @@ function Shell(props: ToolProps<typeof ShellTool>) {
   const limited = createMemo(() => {
     if (expanded() || !overflow()) return output()
     return [...lines().slice(0, 10), "…"].join("\n")
+  })
+
+  createEffect(() => {
+    const toggle = () => setExpanded((prev) => !prev)
+    if (overflow()) ctx.expandToggleSet.add(toggle)
+    onCleanup(() => ctx.expandToggleSet.delete(toggle))
   })
 
   const workdirDisplay = createMemo(() => {
