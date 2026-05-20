@@ -3,7 +3,7 @@ import { useLocal } from "@tui/context/local"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { useRoute } from "@tui/context/route"
-import { useCommandShortcut } from "../../keymap"
+import { useCommandShortcut } from "../keymap"
 
 export function TabBar() {
   const local = useLocal()

@@ -507,6 +507,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         recentOrder() {
           return sessionStore.recentOrder
         },
+        get tabs() {
+          return sessionStore.tabs
+        },
         slots,
         isPinned(sessionID: string) {
           return sessionStore.pinned.includes(sessionID)
