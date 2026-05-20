@@ -1,17 +1,20 @@
-import { Show, For, createMemo } from "solid-js"
+import { Show, For, createMemo, createSignal } from "solid-js"
 import { useLocal } from "@tui/context/local"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { useRoute } from "@tui/context/route"
 import { useCommandShortcut } from "../keymap"
+import { useRenderer } from "@opentui/solid"
 
 export function TabBar() {
   const local = useLocal()
   const sync = useSync()
   const route = useRoute()
   const { theme } = useTheme()
+  const renderer = useRenderer()
   const nextKey = useCommandShortcut("session.tab.next")
   const closeKey = useCommandShortcut("session.tab.close")
+  const [hoverTab, setHoverTab] = createSignal<string>()
 
   const tabs = createMemo(() =>
     local.session.tabs.filter((id) => sync.data.session.some((s) => s.id === id)),
@@ -30,6 +33,7 @@ export function TabBar() {
         <For each={tabs()}>
           {(id) => {
             const isActive = id === active()
+            const isHover = id === hoverTab()
             return (
               <box
                 flexDirection="row"
@@ -40,6 +44,13 @@ export function TabBar() {
                 paddingRight={2}
                 border={isActive ? ["top"] : undefined}
                 borderColor={isActive ? theme.primary : theme.background}
+                backgroundColor={!isActive && isHover ? theme.backgroundMenu : theme.background}
+                onMouseOver={() => setHoverTab(id)}
+                onMouseOut={() => setHoverTab(undefined)}
+                onMouseUp={() => {
+                  if (renderer.getSelection()?.getSelectedText()) return
+                  if (!isActive) local.session.openTab(id)
+                }}
               >
                 <text fg={isActive ? theme.primary : theme.textMuted} wrapMode="none">
                   {isActive ? "● " : "○ "}
