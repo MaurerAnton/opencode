@@ -103,6 +103,7 @@ export const Definitions = {
   session_tab_next: keybind("alt+right,ctrl+tab", "Switch to next tab"),
   session_tab_prev: keybind("alt+left,ctrl+shift+tab", "Switch to previous tab"),
   session_tab_close: keybind("alt+w", "Close current tab"),
+  session_tab_new: keybind("ctrl+n", "New tab"),
 
   stash_delete: keybind("ctrl+d", "Delete stash entry"),
   model_provider_list: keybind("ctrl+a", "Open provider list from model dialog"),
@@ -293,6 +294,7 @@ export const CommandMap = {
   session_tab_next: "session.tab.next",
   session_tab_prev: "session.tab.prev",
   session_tab_close: "session.tab.close",
+  session_tab_new: "session.tab.new",
   stash_delete: "stash.delete",
   model_provider_list: "model.dialog.provider",
   model_favorite_toggle: "model.dialog.favorite",

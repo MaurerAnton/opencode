@@ -160,6 +160,7 @@ const sessionBindingCommands = [
   "session.tab.next",
   "session.tab.prev",
   "session.tab.close",
+  "session.tab.new",
 ] as const
 
 const context = createContext<{
@@ -1059,6 +1060,16 @@ export function Session() {
       run: () => {
         const current = route.data.type === "session" ? route.data.sessionID : undefined
         if (current) local.session.closeTab(current)
+        dialog.clear()
+      },
+    },
+    {
+      title: "New tab",
+      value: "session.tab.new",
+      category: "Session",
+      hidden: true,
+      run: () => {
+        navigate({ type: "home" })
         dialog.clear()
       },
     },

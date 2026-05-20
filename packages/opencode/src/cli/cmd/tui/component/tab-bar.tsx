@@ -14,6 +14,7 @@ export function TabBar() {
   const renderer = useRenderer()
   const nextKey = useCommandShortcut("session.tab.next")
   const closeKey = useCommandShortcut("session.tab.close")
+  const newKey = useCommandShortcut("session.tab.new")
   const [hoverTab, setHoverTab] = createSignal<string>()
 
   const tabs = createMemo(() =>
@@ -60,6 +61,21 @@ export function TabBar() {
             )
           }}
         </For>
+        <box
+          flexShrink={0}
+          paddingTop={1}
+          paddingBottom={0}
+          paddingLeft={2}
+          paddingRight={2}
+          onMouseUp={() => {
+            if (renderer.getSelection()?.getSelectedText()) return
+            route.navigate({ type: "home" })
+          }}
+        >
+          <text fg={theme.textMuted} wrapMode="none">
+            + {newKey()}
+          </text>
+        </box>
         <box flexGrow={1} border={["top"]} borderColor={theme.background} />
         <box paddingRight={2} paddingTop={1}>
           <text fg={theme.textMuted} wrapMode="none">
