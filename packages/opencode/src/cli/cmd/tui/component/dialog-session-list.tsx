@@ -141,6 +141,8 @@ export function DialogSessionList() {
         .map((x) => [x.id, x]),
     )
 
+    const workspaceMap = new Map(project.workspace.list().map((w) => [w.id, w]))
+
     const searchResult = searchResults()
     const displayOrder = searchResult ? orderByRecency(searchResult) : browseOrder()
 
@@ -159,7 +161,7 @@ export function DialogSessionList() {
     function buildOption(id: string, category: string) {
       const x = sessionMap.get(id)
       if (!x) return undefined
-      const workspace = x.workspaceID ? project.workspace.get(x.workspaceID) : undefined
+      const workspace = x.workspaceID ? workspaceMap.get(x.workspaceID) : undefined
 
       let footer: JSX.Element | string = ""
       if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
