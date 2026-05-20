@@ -51,7 +51,7 @@ export const Definitions = {
   app_debug: keybind("none", "Toggle debug panel"),
   app_console: keybind("none", "Toggle console"),
   app_heap_snapshot: keybind("none", "Write heap snapshot"),
-  app_toggle_animations: keybind("none", "Toggle animations"),
+  app_toggle_animations: keybind("<leader>a", "Toggle animations"),
   app_toggle_file_context: keybind("none", "Toggle file context"),
   app_toggle_diffwrap: keybind("none", "Toggle diff wrapping"),
   app_toggle_paste_summary: keybind("none", "Toggle paste summary"),
