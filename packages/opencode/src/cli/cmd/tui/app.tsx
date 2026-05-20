@@ -69,6 +69,7 @@ import { OpencodeKeymapProvider, registerOpencodeKeymap, useBindings, useOpencod
 
 import type { EventSource } from "./context/sdk"
 import { DialogVariant } from "./component/dialog-variant"
+import { TabBar } from "./component/tab-bar"
 
 const appBindingCommands = [
   "command.palette.show",
@@ -956,6 +957,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
         <TimeToFirstDraw />
       </Show>
       <box flexGrow={1} minHeight={0} flexDirection="column">
+        <TabBar />
         <Switch>
           <Match when={route.data.type === "home"}>
             <Home />
