@@ -100,6 +100,10 @@ export const Definitions = {
   session_quick_switch_8: keybind("<leader>8", "Switch to session in quick slot 8"),
   session_quick_switch_9: keybind("<leader>9", "Switch to session in quick slot 9"),
 
+  session_tab_next: keybind("alt+right,ctrl+tab", "Switch to next tab"),
+  session_tab_prev: keybind("alt+left,ctrl+shift+tab", "Switch to previous tab"),
+  session_tab_close: keybind("alt+w", "Close current tab"),
+
   stash_delete: keybind("ctrl+d", "Delete stash entry"),
   model_provider_list: keybind("ctrl+a", "Open provider list from model dialog"),
   model_favorite_toggle: keybind("ctrl+f", "Toggle model favorite status"),
@@ -286,6 +290,9 @@ export const CommandMap = {
   session_quick_switch_7: "session.quick_switch.7",
   session_quick_switch_8: "session.quick_switch.8",
   session_quick_switch_9: "session.quick_switch.9",
+  session_tab_next: "session.tab.next",
+  session_tab_prev: "session.tab.prev",
+  session_tab_close: "session.tab.close",
   stash_delete: "stash.delete",
   model_provider_list: "model.dialog.provider",
   model_favorite_toggle: "model.dialog.favorite",

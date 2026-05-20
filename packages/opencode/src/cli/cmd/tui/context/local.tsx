@@ -389,11 +389,13 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         pinned: string[]
         dismissedRecent: string[]
         recentOrder: string[]
+        tabs: string[]
       }>({
         ready: false,
         pinned: [],
         dismissedRecent: [],
         recentOrder: [],
+        tabs: [],
       })
 
       const filePath = path.join(Global.Path.state, "session.json")
@@ -411,6 +413,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           pinned: sessionStore.pinned,
           dismissedRecent: sessionStore.dismissedRecent,
           recentOrder: sessionStore.recentOrder,
+          tabs: sessionStore.tabs,
         })
       }
 
@@ -419,6 +422,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (Array.isArray(x.pinned)) setSessionStore("pinned", x.pinned)
           if (Array.isArray(x.dismissedRecent)) setSessionStore("dismissedRecent", x.dismissedRecent)
           if (Array.isArray(x.recentOrder)) setSessionStore("recentOrder", x.recentOrder)
+          if (Array.isArray(x.tabs)) setSessionStore("tabs", x.tabs)
         })
         .catch(() => {})
         .finally(() => {
@@ -534,7 +538,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           const target = slots()[slot - 1]
           if (!target) return
           if (route.data.type === "session" && route.data.sessionID === target) return
-          route.navigate({ type: "session", sessionID: target })
+          session.openTab(target)
         },
         cycleRecent(direction: 1 | -1) {
           if (route.data.type !== "session") {
@@ -565,6 +569,45 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (!target || target === current) return
           cycling = true
           route.navigate({ type: "session", sessionID: target })
+        },
+        openTab(sessionID: string) {
+          const existing = sync.data.session.some((s) => s.id === sessionID)
+          if (!existing) return
+          batch(() => {
+            const filtered = sessionStore.tabs.filter((id) => id !== sessionID)
+            setSessionStore("tabs", [...filtered, sessionID])
+            save()
+          })
+          route.navigate({ type: "session", sessionID })
+        },
+        closeTab(sessionID: string) {
+          const tabs = sessionStore.tabs
+          if (tabs.length <= 1) return
+          const idx = tabs.indexOf(sessionID)
+          batch(() => {
+            setSessionStore(
+              "tabs",
+              tabs.filter((id) => id !== sessionID),
+            )
+            save()
+          })
+          if (route.data.type === "session" && route.data.sessionID === sessionID) {
+            const next = tabs[idx + 1] ?? tabs[idx - 1]
+            if (next) route.navigate({ type: "session", sessionID: next })
+          }
+        },
+        switchTab(direction: 1 | -1) {
+          const tabs = sessionStore.tabs
+          if (tabs.length < 2) return
+          const current = route.data.type === "session" ? route.data.sessionID : tabs[0]
+          const idx = tabs.indexOf(current)
+          if (idx === -1) {
+            route.navigate({ type: "session", sessionID: tabs[0] })
+            return
+          }
+          const next = idx + direction
+          if (next < 0 || next >= tabs.length) return
+          route.navigate({ type: "session", sessionID: tabs[next] })
         },
       }
     })

@@ -22,6 +22,7 @@ import { useSync } from "@tui/context/sync"
 import { useEvent } from "@tui/context/event"
 import { SplitBorder } from "@tui/component/border"
 import { Spinner } from "@tui/component/spinner"
+import { TabBar } from "@tui/component/tab-bar"
 import { selectedForeground, useTheme } from "@tui/context/theme"
 import { BoxRenderable, ScrollBoxRenderable, addDefaultParsers, TextAttributes, RGBA } from "@opentui/core"
 import { Prompt, type PromptRef } from "@tui/component/prompt"
@@ -156,6 +157,9 @@ const sessionBindingCommands = [
   "session.parent",
   "session.child.next",
   "session.child.previous",
+  "session.tab.next",
+  "session.tab.prev",
+  "session.tab.close",
 ] as const
 
 const context = createContext<{
@@ -1028,6 +1032,37 @@ export function Session() {
       },
     },
     {
+      title: "Next tab",
+      value: "session.tab.next",
+      category: "Session",
+      hidden: true,
+      run: () => {
+        local.session.switchTab(1)
+        dialog.clear()
+      },
+    },
+    {
+      title: "Previous tab",
+      value: "session.tab.prev",
+      category: "Session",
+      hidden: true,
+      run: () => {
+        local.session.switchTab(-1)
+        dialog.clear()
+      },
+    },
+    {
+      title: "Close tab",
+      value: "session.tab.close",
+      category: "Session",
+      hidden: true,
+      run: () => {
+        const current = route.data.type === "session" ? route.data.sessionID : undefined
+        if (current) local.session.closeTab(current)
+        dialog.clear()
+      },
+    },
+    {
       title: "Go to child session",
       value: "session.child.first",
       category: "Session",
@@ -1124,6 +1159,16 @@ export function Session() {
   // snap to bottom when session changes
   createEffect(on(() => route.sessionID, toBottom))
 
+  // auto-add current session to tabs
+  createEffect(
+    on(
+      () => route.sessionID,
+      (id) => {
+        if (id && !local.session.tabs.includes(id)) local.session.openTab(id)
+      },
+    ),
+  )
+
   return (
     <PathFormatterProvider path={session()?.directory}>
       <context.Provider
@@ -1147,6 +1192,7 @@ export function Session() {
         <box flexDirection="row" flexGrow={1} minHeight={0}>
           <box flexGrow={1} minHeight={0} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={1}>
             <Show when={session()}>
+              <TabBar />
               <scrollbox
                 ref={(r) => (scroll = r)}
                 viewportOptions={{
