@@ -1524,6 +1524,24 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
     return Math.round((tokens.output / dur) * 1000)
   })
 
+  const [tick, setTick] = createSignal(0)
+  const timer = setInterval(() => setTick((t) => t + 1), 300)
+  onCleanup(() => clearInterval(timer))
+
+  const streamingSpeed = () => {
+    tick()
+    if (final()) return 0
+    if (!props.message.time?.created) return 0
+    const elapsed = Date.now() - props.message.time.created
+    if (elapsed < 500) return 0
+    const textLen = props.parts.reduce((sum, p) => sum + ("text" in p ? (p.text?.length ?? 0) : 0), 0)
+    const estimatedTokens = textLen / 4
+    if (estimatedTokens < 1) return 0
+    return Math.round((estimatedTokens / elapsed) * 1000)
+  }
+
+  const speedDisplay = createMemo(() => speed() || streamingSpeed())
+
   const childShortcut = useCommandShortcut("session.child.first")
 
   return (
@@ -1584,8 +1602,8 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
               </Show>
-              <Show when={speed()}>
-                <span style={{ fg: theme.textMuted }}> · {speed()} t/s</span>
+              <Show when={speedDisplay()}>
+                <span style={{ fg: theme.textMuted }}> · {speedDisplay()} t/s</span>
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
                 <span style={{ fg: theme.textMuted }}> · interrupted</span>
