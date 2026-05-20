@@ -4,6 +4,9 @@ FROM alpine AS base
 # On ephemeral containers, the cache is not useful
 ARG BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
 ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=${BUN_RUNTIME_TRANSPILER_CACHE_PATH}
+# Prevent extraction of bundled native libs into shared /tmp
+ARG BUN_TMPDIR=/var/lib/opencode-bun-tmp
+ENV BUN_TMPDIR=${BUN_TMPDIR}
 RUN apk add libgcc libstdc++ ripgrep
 
 FROM base AS build-amd64

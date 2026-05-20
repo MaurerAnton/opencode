@@ -8,8 +8,11 @@ const os = require("os")
 const forwardedSignals = ["SIGINT", "SIGTERM", "SIGHUP"]
 
 function run(target) {
+  const bunTmpDir = process.env.BUN_TMPDIR || path.join(os.homedir(), ".cache", "opencode", "bun-runtime")
+  fs.mkdirSync(bunTmpDir, { recursive: true })
   const child = childProcess.spawn(target, process.argv.slice(2), {
     stdio: "inherit",
+    env: { ...process.env, BUN_TMPDIR: bunTmpDir },
   })
 
   child.on("error", (error) => {

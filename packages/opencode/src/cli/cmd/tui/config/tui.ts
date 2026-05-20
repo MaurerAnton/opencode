@@ -1,6 +1,5 @@
 export * as TuiConfig from "./tui"
 
-import { createBindingLookup } from "@opentui/keymap/extras"
 import { mergeDeep, unique } from "remeda"
 import { Context, Effect, Fiber, Layer, Schema } from "effect"
 import { ConfigParse } from "@/config/parse"
@@ -195,6 +194,7 @@ const loadState = Effect.fn("TuiConfig.loadState")(function* (ctx: { directory: 
     keybinds.input_undo ??= unique(["ctrl+z", ...(typeof inputUndo === "string" ? inputUndo.split(",") : [])]).join(",")
   }
   const parsedKeybinds = TuiKeybind.parse(keybinds)
+  const { createBindingLookup } = yield* Effect.promise(() => import("@opentui/keymap/extras"))
   const result: Resolved = {
     ...acc.result,
     keybinds: createBindingLookup(TuiKeybind.toBindingConfig(parsedKeybinds), {
