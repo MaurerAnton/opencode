@@ -20,6 +20,8 @@ import { serviceUse } from "@/effect/service-use"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { SessionEvent } from "@opencode-ai/core/session-event"
+import { mkdirSync, readdirSync, writeFileSync } from "fs"
+import { join } from "path"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -581,6 +583,8 @@ export const layer = Layer.effect(
       return result
     })
 
+    const lastExportTime = new Map<SessionID, number>()
+
     const create = Effect.fn("SessionCompaction.create")(function* (input: {
       sessionID: SessionID
       agent: string
@@ -588,6 +592,51 @@ export const layer = Layer.effect(
       auto: boolean
       overflow?: boolean
     }) {
+      if (input.auto) {
+        const [sinfo, smsgs] = yield* Effect.all([
+          session.get(input.sessionID).pipe(Effect.option),
+          session.messages({ sessionID: input.sessionID }).pipe(Effect.option),
+        ])
+        if (sinfo._tag === "Some" && smsgs._tag === "Some") {
+          const s = sinfo.value
+          const msgs = smsgs.value
+          const dir = s.directory
+          if (dir) {
+            const now = Date.now()
+            const last = lastExportTime.get(input.sessionID)
+            if (!last || now - last >= 30 * 60 * 1000) {
+              yield* Effect.sync(() => {
+                const outDir = join(dir, "exports")
+                mkdirSync(outDir, { recursive: true })
+                const prefix = `${s.slug}-`
+                let maxN = 0
+                for (const f of readdirSync(outDir)) {
+                  const fn = f.match(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d+)\\.md$`))
+                  if (fn) maxN = Math.max(maxN, Number.parseInt(fn[1]!, 10))
+                }
+                const n = maxN + 1
+                const lines: string[] = [`# ${s.title}`, "", `---`, ""]
+                for (const msg of msgs) {
+                  const role = msg.info.role === "user" ? "User" : "Assistant"
+                  lines.push(`### ${role}`, "")
+                  for (const part of msg.parts) {
+                    if (part.type === "text") lines.push(part.text, "")
+                    if (part.type === "reasoning") lines.push(`_Thinking:_`, "", part.text, "")
+                    if (part.type === "tool") {
+                      lines.push(`**Tool: ${part.tool}**`, "```json", JSON.stringify(part.input ?? {}, null, 2), "```", "")
+                      if (part.state?.output) lines.push(part.state.output, "")
+                    }
+                  }
+                  lines.push(`---`, "")
+                }
+                writeFileSync(join(outDir, `${prefix}${n}.md`), lines.join("\n"))
+                lastExportTime.set(input.sessionID, now)
+              })
+            }
+          }
+        }
+      }
+
       const msg = yield* session.updateMessage({
         id: MessageID.ascending(),
         role: "user",
