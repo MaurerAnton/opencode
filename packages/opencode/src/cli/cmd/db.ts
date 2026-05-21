@@ -1,13 +1,21 @@
 import type { Argv } from "yargs"
 import { spawn } from "child_process"
 import { Database } from "@/storage/db"
-import { drizzle } from "drizzle-orm/bun-sqlite"
-import { Database as BunDatabase } from "bun:sqlite"
+import { init as dbInit } from "#db"
 import { UI } from "../ui"
 import { cmd } from "./cmd"
 import { JsonMigration } from "@/storage/json-migration"
 import { EOL } from "os"
 import { errorMessage } from "../../util/error"
+
+function openSqlite(path: string, opts?: { readonly?: boolean }) {
+  if (typeof Bun !== "undefined") {
+    const { Database: BunDB } = require("bun:sqlite")
+    return new BunDB(path, { readonly: opts?.readonly, create: !opts?.readonly })
+  }
+  const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite")
+  return new DatabaseSync(path)
+}
 
 const QueryCommand = cmd({
   command: "$0 [query]",
@@ -28,7 +36,7 @@ const QueryCommand = cmd({
   handler: async (args: { query?: string; format: string }) => {
     const query = args.query as string | undefined
     if (query) {
-      const db = new BunDatabase(Database.getPath(), { readonly: true })
+      const db = openSqlite(Database.getPath(), { readonly: true })
       try {
         const result = db.query(query).all() as Record<string, unknown>[]
         if (args.format === "json") {
@@ -66,7 +74,7 @@ const MigrateCommand = cmd({
   command: "migrate",
   describe: "migrate JSON data to SQLite (merges with existing data)",
   handler: async () => {
-    const sqlite = new BunDatabase(Database.getPath())
+    const sqlite = openSqlite(Database.getPath())
     const tty = process.stderr.isTTY
     const width = 36
     const orange = "\x1b[38;5;214m"

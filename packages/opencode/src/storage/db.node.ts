@@ -1,24 +1,22 @@
-import { DatabaseSync } from "node:sqlite"
-import { drizzle } from "drizzle-orm/node-sqlite"
-import { migrate as drizzleMigrate } from "drizzle-orm/node-sqlite/migrator"
+import Database from "better-sqlite3"
+import { drizzle } from "drizzle-orm/better-sqlite3"
+import { migrate as drizzleMigrate } from "drizzle-orm/better-sqlite3/migrator"
 
 export function init(path: string) {
-  const sqlite = new DatabaseSync(path)
+  const sqlite = new Database(path)
+  
+  // Performance pragmas
+  sqlite.pragma("journal_mode = WAL")
+  sqlite.pragma("synchronous = NORMAL")
+  sqlite.pragma("busy_timeout = 5000")
+  sqlite.pragma("cache_size = -64000")
+  sqlite.pragma("foreign_keys = ON")
+  
   const db = drizzle({ client: sqlite })
-
-  // Expose raw SQLite client for close()
+  
+  // Expose raw client for close() and direct access
   ;(db as any).$client = sqlite
-
-  // Monkey-patch run() to handle PRAGMAs (drizzle's run expects ORM queries)
-  const origRun = (db as any).run.bind(db) as Function
-  ;(db as any).run = function (sql: string, ...params: any[]) {
-    if (typeof sql === "string" && sql.trim().toUpperCase().startsWith("PRAGMA")) {
-      sqlite.exec(sql)
-      return { changes: 0, lastInsertRowid: 0 }
-    }
-    return origRun(sql, ...params)
-  }
-
+  
   return db
 }
 

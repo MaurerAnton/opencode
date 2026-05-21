@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import DESCRIPTION from "./browser.txt"
-import { $ } from "bun"
+import { $, spawn as compatSpawn } from "@/compat/runtime"
 import { readFile, unlink } from "fs/promises"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -57,7 +57,7 @@ async function takeScreenshot(params: Params): Promise<Buffer> {
         ]
 
   try {
-    const proc = Bun.spawn([browser, ...args, params.url], {
+    const proc = compatSpawn([browser, ...args, params.url], {
       stdout: "pipe",
       stderr: "pipe",
     })
