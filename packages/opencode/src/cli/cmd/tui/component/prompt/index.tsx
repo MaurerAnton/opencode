@@ -1666,6 +1666,20 @@ export function Prompt(props: PromptProps) {
                         </text>
                       )}
                     </Show>
+                    <Show when={status().type === "busy"}>
+                      <box
+                        paddingLeft={1}
+                        paddingRight={1}
+                        onMouseUp={() => {
+                          if (renderer.getSelection()?.getSelectedText()) return
+                          command.run("session.interrupt")
+                        }}
+                      >
+                        <text fg={theme.warning} wrapMode="none">
+                          ESC
+                        </text>
+                      </box>
+                    </Show>
                     <box flexDirection="row" gap={1} flexShrink={0}>
                     {(() => {
                       const retry = createMemo(() => {
