@@ -239,7 +239,7 @@ export const layer: Layer.Layer<
           task: Tool.init(task),
           task_status: Tool.init(taskStatus),
           fetch: Tool.init(webfetch),
-          browser: Tool.init(browser)
+          browser: Tool.init(browser),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
           repo_clone: Tool.init(repoClone),

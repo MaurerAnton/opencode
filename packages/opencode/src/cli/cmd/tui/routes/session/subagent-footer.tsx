@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show } from "solid-js"
+import { createMemo, createSignal, onCleanup, Show } from "solid-js"
 import { useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { useSyncV2 } from "@tui/context/sync-v2"
@@ -13,12 +13,12 @@ export function SubagentFooter() {
   const route = useRouteData("session")
   const sync = useSync()
   const syncV2 = useSyncV2()
-  const local = useLocal()
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const session = createMemo(() => sync.session.get(route.sessionID))
 
   const [tick, setTick] = createSignal(0)
   const timer = setInterval(() => setTick((t) => t + 1), 1000)
+  onCleanup(() => clearInterval(timer))
 
   const activity = createMemo(() => {
     tick()
