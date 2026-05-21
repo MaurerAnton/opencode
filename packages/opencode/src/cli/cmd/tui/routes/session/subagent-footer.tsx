@@ -7,13 +7,13 @@ import { SplitBorder } from "@tui/component/border"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "@/util/locale"
 import { useTerminalDimensions } from "@opentui/solid"
-import { useCommandPalette } from "../../context/command-palette"
 import { useCommandShortcut } from "../../keymap"
 
 export function SubagentFooter() {
   const route = useRouteData("session")
   const sync = useSync()
   const syncV2 = useSyncV2()
+  const local = useLocal()
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const session = createMemo(() => sync.session.get(route.sessionID))
 
@@ -122,7 +122,6 @@ export function SubagentFooter() {
             <box
               onMouseOver={() => setHover("parent")}
               onMouseOut={() => setHover(null)}
-              onMouseUp={() => command.run("session.parent")}
               backgroundColor={hover() === "parent" ? theme.backgroundElement : theme.backgroundPanel}
             >
               <text fg={theme.text}>
@@ -132,7 +131,6 @@ export function SubagentFooter() {
             <box
               onMouseOver={() => setHover("prev")}
               onMouseOut={() => setHover(null)}
-              onMouseUp={() => command.run("session.child.previous")}
               backgroundColor={hover() === "prev" ? theme.backgroundElement : theme.backgroundPanel}
             >
               <text fg={theme.text}>
@@ -142,7 +140,6 @@ export function SubagentFooter() {
             <box
               onMouseOver={() => setHover("next")}
               onMouseOut={() => setHover(null)}
-              onMouseUp={() => command.run("session.child.next")}
               backgroundColor={hover() === "next" ? theme.backgroundElement : theme.backgroundPanel}
             >
               <text fg={theme.text}>
