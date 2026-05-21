@@ -1,5 +1,4 @@
 import { type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
-import { migrate } from "drizzle-orm/bun-sqlite/migrator"
 import { type SQLiteTransaction } from "drizzle-orm/sqlite-core"
 export * from "drizzle-orm"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -12,7 +11,7 @@ import { readFileSync, readdirSync, existsSync } from "fs"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
 import { EffectBridge } from "@/effect/bridge"
-import { init } from "#db"
+import { init, migrate } from "#db"
 import { Effect, Schema } from "effect"
 
 declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
@@ -50,9 +49,9 @@ type Client = ReturnType<typeof init>
 type Journal = { sql: string; timestamp: number; name: string }[]
 
 // Drizzle's migrate overloads trigger expensive variance checks here; narrow to the journal overload we actually use.
-const migrateFromJournal = migrate as unknown as (db: SQLiteBunDatabase, entries: Journal) => void
+const migrateFromJournal = migrate as unknown as (db: Parameters<typeof migrate>[0], entries: Journal) => void
 
-function applyMigrations(db: SQLiteBunDatabase, entries: Journal) {
+function applyMigrations(db: Parameters<typeof migrate>[0], entries: Journal) {
   migrateFromJournal(db, entries)
 }
 
