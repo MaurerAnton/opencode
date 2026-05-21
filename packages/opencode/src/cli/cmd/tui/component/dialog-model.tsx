@@ -9,6 +9,13 @@ import { DialogVariant } from "./dialog-variant"
 import * as fuzzysort from "fuzzysort"
 import { useConnected } from "./use-connected"
 
+function modelFooter(info: { cost?: { input: number }; modalities?: { input?: string[] } }, providerID: string) {
+  const tags: string[] = []
+  if (info.cost?.input === 0 && providerID === "opencode") tags.push("Free")
+  if (info.modalities?.input?.includes("image")) tags.push("👁")
+  return tags.length > 0 ? tags.join(" · ") : undefined
+}
+
 export function DialogModel(props: { providerID?: string }) {
   const local = useLocal()
   const sync = useSync()
@@ -41,7 +48,7 @@ export function DialogModel(props: { providerID?: string }) {
             description: provider.name,
             category,
             disabled: provider.id === "opencode" && model.id.includes("-nano"),
-            footer: model.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            footer: modelFooter(model, provider.id),
             onSelect: () => {
               onSelect(provider.id, model.id)
             },
@@ -78,7 +85,7 @@ export function DialogModel(props: { providerID?: string }) {
               : undefined,
             category: connected() ? provider.name : undefined,
             disabled: provider.id === "opencode" && model.includes("-nano"),
-            footer: info.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            footer: modelFooter(info, provider.id),
             onSelect() {
               onSelect(provider.id, model)
             },

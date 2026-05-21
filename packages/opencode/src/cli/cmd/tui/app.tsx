@@ -2,7 +2,6 @@ import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@op
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import * as Clipboard from "@tui/util/clipboard"
 import * as Selection from "@tui/util/selection"
-import * as TuiAudio from "@tui/util/audio"
 import { createCliRenderer, MouseButton, type CliRendererConfig } from "@opentui/core"
 import { RouteProvider, useRoute } from "@tui/context/route"
 import {
@@ -64,25 +63,20 @@ import { TuiConfig } from "@/cli/cmd/tui/config/tui"
 import { TuiPluginRuntime } from "@/cli/cmd/tui/plugin/runtime"
 import { createTuiApi } from "@/cli/cmd/tui/plugin/api"
 import type { RouteMap } from "@/cli/cmd/tui/plugin/api"
-import { createTuiAttention } from "@/cli/cmd/tui/attention"
 import { FormatError, FormatUnknownError } from "@/cli/error"
-import { CommandPaletteDialog } from "./component/command-palette"
-import {
-  COMMAND_PALETTE_COMMAND,
-  OPENCODE_BASE_MODE,
-  OpencodeKeymapProvider,
-  registerOpencodeKeymap,
-  useBindings,
-  useOpencodeKeymap,
-} from "./keymap"
+import { CommandPaletteProvider, useCommandPalette } from "./context/command-palette"
+import { OpencodeKeymapProvider, registerOpencodeKeymap, useBindings, useOpencodeKeymap } from "./keymap"
 
 import type { EventSource } from "./context/sdk"
 import { DialogVariant } from "./component/dialog-variant"
+import { TabBar } from "./component/tab-bar"
 
 const appBindingCommands = [
   "command.palette.show",
   "session.list",
   "session.new",
+  "session.cycle_recent",
+  "session.cycle_recent_reverse",
   "session.quick_switch.1",
   "session.quick_switch.2",
   "session.quick_switch.3",
@@ -183,10 +177,10 @@ export function tui(input: {
       unguard?.()
       resolve()
     }
+
     const onBeforeExit = async () => {
       offKeymap()
       await TuiPluginRuntime.dispose()
-      TuiAudio.dispose()
     }
 
     const renderer = await createCliRenderer(rendererConfig(input.config))
@@ -234,15 +228,17 @@ export function tui(input: {
                                   <LocalProvider>
                                     <PromptStashProvider>
                                       <DialogProvider>
-                                        <FrecencyProvider>
-                                          <PromptHistoryProvider>
-                                            <PromptRefProvider>
-                                              <EditorContextProvider>
-                                                <App onSnapshot={input.onSnapshot} />
-                                              </EditorContextProvider>
-                                            </PromptRefProvider>
-                                          </PromptHistoryProvider>
-                                        </FrecencyProvider>
+                                        <CommandPaletteProvider>
+                                          <FrecencyProvider>
+                                            <PromptHistoryProvider>
+                                              <PromptRefProvider>
+                                                <EditorContextProvider>
+                                                  <App onSnapshot={input.onSnapshot} />
+                                                </EditorContextProvider>
+                                              </PromptRefProvider>
+                                            </PromptHistoryProvider>
+                                          </FrecencyProvider>
+                                        </CommandPaletteProvider>
                                       </DialogProvider>
                                     </PromptStashProvider>
                                   </LocalProvider>
@@ -272,6 +268,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
   const dialog = useDialog()
   const local = useLocal()
   const kv = useKV()
+  const command = useCommandPalette()
   const keymap = useOpencodeKeymap()
   const event = useEvent()
   const sdk = useSDK()
@@ -287,7 +284,6 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     routeRev()
     return routes.get(name)?.at(-1)?.render
   }
-  const attention = createTuiAttention({ renderer, config: tuiConfig, kv })
 
   const api = createTuiApi({
     tuiConfig,
@@ -303,13 +299,11 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     theme: themeState,
     toast,
     renderer,
-    attention,
   })
   const [ready, setReady] = createSignal(false)
   TuiPluginRuntime.init({
     api,
     config: tuiConfig,
-    dispose: () => attention.dispose(),
   })
     .catch((error) => {
       console.error("Failed to load TUI plugins", error)
@@ -327,10 +321,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     },
     { priority: 1 },
   )
-  onCleanup(() => {
-    offSelectionKeys()
-    attention.dispose()
-  })
+  onCleanup(offSelectionKeys)
 
   // Wire up console copy-to-clipboard via opentui's onCopySelection callback
   renderer.console.onCopySelection = async (text: string) => {
@@ -450,12 +441,12 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
   const appCommands = createMemo(() =>
     [
       {
-        name: COMMAND_PALETTE_COMMAND,
+        name: "command.palette.show",
         title: "Show command palette",
         category: "System",
         hidden: true,
         run: () => {
-          dialog.replace(() => <CommandPaletteDialog />)
+          command.show()
         },
       },
       {
@@ -483,15 +474,37 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
           dialog.clear()
         },
       },
-      ...Array.from({ length: 9 }, (_, i) => ({
-        name: `session.quick_switch.${i + 1}`,
-        title: `Switch to session in quick slot ${i + 1}`,
-        category: "Session",
-        hidden: true,
-        run: () => {
-          local.session.quickSwitch(i + 1)
-        },
-      })),
+      ...(Flag.OPENCODE_EXPERIMENTAL_SESSION_SWITCHING
+        ? [
+            {
+              name: "session.cycle_recent",
+              title: "Cycle to previous recent session",
+              category: "Session",
+              hidden: true,
+              run: () => {
+                local.session.cycleRecent(1)
+              },
+            },
+            {
+              name: "session.cycle_recent_reverse",
+              title: "Cycle to next recent session",
+              category: "Session",
+              hidden: true,
+              run: () => {
+                local.session.cycleRecent(-1)
+              },
+            },
+            ...Array.from({ length: 9 }, (_, i) => ({
+              name: `session.quick_switch.${i + 1}`,
+              title: `Switch to session in quick slot ${i + 1}`,
+              category: "Session",
+              hidden: true,
+              run: () => {
+                local.session.quickSwitch(i + 1)
+              },
+            })),
+          ]
+        : []),
       {
         name: "model.list",
         title: "Switch model",
@@ -805,13 +818,21 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
   }))
 
   useBindings(() => ({
-    mode: OPENCODE_BASE_MODE,
-    bindings: tuiConfig.keybinds.gather("app", appBindingCommands),
+    enabled: command.matcher,
+    bindings: tuiConfig.keybinds.gather(
+      "app",
+      Flag.OPENCODE_EXPERIMENTAL_SESSION_SWITCHING
+        ? appBindingCommands
+        : appBindingCommands.filter(
+            (c) => !c.startsWith("session.cycle_recent") && !c.startsWith("session.quick_switch"),
+          ),
+    ),
   }))
 
   useBindings(() => ({
-    mode: OPENCODE_BASE_MODE,
     enabled: () => {
+      const ok = command.matcher.get()
+      if (!ok) return false
       const current = promptRef.current
       if (!current?.focused) return true
       return current.current.input === ""
@@ -820,7 +841,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
   }))
 
   event.on(TuiEvent.CommandExecute.type, (evt) => {
-    keymap.dispatchCommand(evt.properties.command)
+    command.run(evt.properties.command)
   })
 
   event.on(TuiEvent.ToastShow.type, (evt) => {
@@ -862,7 +883,6 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
   })
 
   event.on("installation.update-available", async (evt) => {
-    console.log("installation.update-available", evt)
     const version = evt.properties.version
 
     const skipped = kv.get("skipped_version")
@@ -936,24 +956,27 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
       <Show when={Flag.OPENCODE_SHOW_TTFD}>
         <TimeToFirstDraw />
       </Show>
+      <box flexGrow={1} minHeight={0} flexDirection="column">
+        <TabBar />
+        <Switch>
+          <Match when={route.data.type === "home"}>
+            <Home />
+          </Match>
+          <Match when={route.data.type === "session"}>
+            <Session />
+          </Match>
+        </Switch>
+        <Show when={ready()}>{plugin()}</Show>
+      </box>
       <Show when={ready()}>
-        <box flexGrow={1} minHeight={0} flexDirection="column">
-          <Switch>
-            <Match when={route.data.type === "home"}>
-              <Home />
-            </Match>
-            <Match when={route.data.type === "session"}>
-              <Session />
-            </Match>
-          </Switch>
-          {plugin()}
-        </box>
         <box flexShrink={0}>
           <TuiPluginRuntime.Slot name="app_bottom" />
         </box>
         <TuiPluginRuntime.Slot name="app" />
       </Show>
-      <StartupLoading ready={ready} />
+      <Show when={!ready()}>
+        <StartupLoading ready={ready} />
+      </Show>
     </box>
   )
 }

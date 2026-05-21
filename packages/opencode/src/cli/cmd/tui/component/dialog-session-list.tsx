@@ -31,8 +31,6 @@ export function DialogSessionList() {
   const [toDelete, setToDelete] = createSignal<string>()
   const [search, setSearch] = createDebouncedSignal("", 150)
   const deleteHint = useCommandShortcut("session.delete")
-  const quickSwitch1 = useCommandShortcut("session.quick_switch.1")
-  const quickSwitch9 = useCommandShortcut("session.quick_switch.9")
 
   const [searchResults, { refetch }] = createResource(
     () => ({ query: search(), filter: sync.session.query() }),
@@ -132,18 +130,10 @@ export function DialogSessionList() {
 
   const [browseOrder] = createSignal<string[]>(orderByRecency(sync.data.session))
 
-  const quickSwitchHint = createMemo(() => {
-    const first = quickSwitch1()
-    const last = quickSwitch9()
-    if (!first || !last) return undefined
-    return quickSwitchRange(first, last)
-  })
-  const quickSwitchFooterHints = createMemo(() => {
-    const hint = quickSwitchHint()
-    return hint && local.session.slots().length > 0 ? [{ title: "switch", label: hint }] : []
-  })
+  const RECENT_LIMIT = 5
 
   const options = createMemo(() => {
+    const enabled = Flag.OPENCODE_EXPERIMENTAL_SESSION_SWITCHING
     const today = new Date().toDateString()
     const sessionMap = new Map(
       sessions()
@@ -151,17 +141,27 @@ export function DialogSessionList() {
         .map((x) => [x.id, x]),
     )
 
+    const workspaceMap = new Map(project.workspace.list().map((w) => [w.id, w]))
+
     const searchResult = searchResults()
     const displayOrder = searchResult ? orderByRecency(searchResult) : browseOrder()
 
-    const pinned = local.session.pinned().filter((id) => sessionMap.has(id))
+    const dismissed = enabled ? new Set(local.session.dismissedRecent()) : new Set<string>()
+    const pinned = enabled ? local.session.pinned().filter((id) => sessionMap.has(id)) : []
     const pinnedSet = new Set(pinned)
-    const slotByID = new Map<string, number>(local.session.slots().map((id, i) => [id, i + 1]))
+    const slotByID = enabled
+      ? new Map<string, number>(local.session.slots().map((id, i) => [id, i + 1]))
+      : new Map<string, number>()
+
+    const recent = enabled
+      ? displayOrder.filter((id) => !pinnedSet.has(id) && !dismissed.has(id)).slice(0, RECENT_LIMIT)
+      : []
+    const recentSet = new Set(recent)
 
     function buildOption(id: string, category: string) {
       const x = sessionMap.get(id)
       if (!x) return undefined
-      const workspace = x.workspaceID ? project.workspace.get(x.workspaceID) : undefined
+      const workspace = x.workspaceID ? workspaceMap.get(x.workspaceID) : undefined
 
       let footer: JSX.Element | string = ""
       if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
@@ -200,7 +200,7 @@ export function DialogSessionList() {
     }
 
     const remaining = displayOrder
-      .filter((id) => !pinnedSet.has(id))
+      .filter((id) => !pinnedSet.has(id) && !recentSet.has(id))
       .map((id) => {
         const x = sessionMap.get(id)
         if (!x) return undefined
@@ -209,7 +209,11 @@ export function DialogSessionList() {
       })
       .filter((x) => x !== undefined)
 
-    return [...pinned.map((id) => buildOption(id, "Pinned")).filter((x) => x !== undefined), ...remaining]
+    return [
+      ...pinned.map((id) => buildOption(id, "Pinned")).filter((x) => x !== undefined),
+      ...recent.map((id) => buildOption(id, "Recent")).filter((x) => x !== undefined),
+      ...remaining,
+    ]
   })
 
   onMount(() => {
@@ -227,20 +231,36 @@ export function DialogSessionList() {
         setToDelete(undefined)
       }}
       onSelect={(option) => {
-        route.navigate({
-          type: "session",
-          sessionID: option.value,
-        })
+        local.session.openTab(option.value)
         dialog.clear()
       }}
       actions={[
-        {
-          command: "session.pin.toggle",
-          title: "pin/unpin",
-          onTrigger: (option: { value: string }) => {
-            local.session.togglePin(option.value)
-          },
-        },
+        ...(Flag.OPENCODE_EXPERIMENTAL_SESSION_SWITCHING
+          ? [
+              {
+                command: "session.pin.toggle",
+                title: "pin/unpin",
+                onTrigger: (option: { value: string }) => {
+                  local.session.togglePin(option.value)
+                },
+              },
+              {
+                command: "session.toggle.recent",
+                title: "toggle recent",
+                onTrigger: (option: { value: string }) => {
+                  if (local.session.isPinned(option.value)) {
+                    toast.show({
+                      variant: "info",
+                      message: "Unpin the session first to toggle it in Recent",
+                      duration: 3000,
+                    })
+                    return
+                  }
+                  local.session.toggleRecent(option.value)
+                },
+              },
+            ]
+          : []),
         {
           command: "session.delete",
           title: "delete",
@@ -297,13 +317,6 @@ export function DialogSessionList() {
           },
         },
       ]}
-      footerHints={quickSwitchFooterHints()}
     />
   )
-}
-
-function quickSwitchRange(first: string, last: string) {
-  const prefix = first.slice(0, -1)
-  if (first.endsWith("1") && last === `${prefix}9`) return `${prefix}1-9`
-  return `${first} through ${last}`
 }

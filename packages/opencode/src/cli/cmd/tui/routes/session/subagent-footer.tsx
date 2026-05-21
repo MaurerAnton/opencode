@@ -1,18 +1,36 @@
 import { createMemo, createSignal, Show } from "solid-js"
 import { useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
+import { useSyncV2 } from "@tui/context/sync-v2"
 import { useTheme } from "@tui/context/theme"
 import { SplitBorder } from "@tui/component/border"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "@/util/locale"
 import { useTerminalDimensions } from "@opentui/solid"
-import { useCommandShortcut, useOpencodeKeymap } from "../../keymap"
+import { useCommandPalette } from "../../context/command-palette"
+import { useCommandShortcut } from "../../keymap"
 
 export function SubagentFooter() {
   const route = useRouteData("session")
   const sync = useSync()
+  const syncV2 = useSyncV2()
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const session = createMemo(() => sync.session.get(route.sessionID))
+
+  const [tick, setTick] = createSignal(0)
+  const timer = setInterval(() => setTick((t) => t + 1), 1000)
+
+  const activity = createMemo(() => {
+    tick()
+    const s = sync.data.session_status?.[route.sessionID]
+    if (!s || s.type === "idle") return
+    const last = syncV2.data.last_delta_at[route.sessionID]
+    const ago = last ? ((Date.now() - last) / 1000) | 0 : 99
+    if (last && ago > 5 && s.type === "busy")
+      return { stale: true, ago }
+    if (s.type === "busy") return { streaming: true }
+    return
+  })
 
   const subagentInfo = createMemo(() => {
     const s = session()
@@ -55,7 +73,7 @@ export function SubagentFooter() {
   })
 
   const { theme } = useTheme()
-  const keymap = useOpencodeKeymap()
+  const command = useCommandPalette()
   const parentShortcut = useCommandShortcut("session.parent")
   const previousShortcut = useCommandShortcut("session.child.previous")
   const nextShortcut = useCommandShortcut("session.child.next")
@@ -92,12 +110,19 @@ export function SubagentFooter() {
                 </text>
               )}
             </Show>
+            <Show when={activity()}>
+              {(a) => (
+                <text fg={a().stale ? theme.error : theme.textMuted} wrapMode="none">
+                  {a().stale ? `⚠ no delta for ${a().ago}s` : "streaming"}
+                </text>
+              )}
+            </Show>
           </box>
           <box flexDirection="row" gap={2}>
             <box
               onMouseOver={() => setHover("parent")}
               onMouseOut={() => setHover(null)}
-              onMouseUp={() => keymap.dispatchCommand("session.parent")}
+              onMouseUp={() => command.run("session.parent")}
               backgroundColor={hover() === "parent" ? theme.backgroundElement : theme.backgroundPanel}
             >
               <text fg={theme.text}>
@@ -107,7 +132,7 @@ export function SubagentFooter() {
             <box
               onMouseOver={() => setHover("prev")}
               onMouseOut={() => setHover(null)}
-              onMouseUp={() => keymap.dispatchCommand("session.child.previous")}
+              onMouseUp={() => command.run("session.child.previous")}
               backgroundColor={hover() === "prev" ? theme.backgroundElement : theme.backgroundPanel}
             >
               <text fg={theme.text}>
@@ -117,7 +142,7 @@ export function SubagentFooter() {
             <box
               onMouseOver={() => setHover("next")}
               onMouseOut={() => setHover(null)}
-              onMouseUp={() => keymap.dispatchCommand("session.child.next")}
+              onMouseUp={() => command.run("session.child.next")}
               backgroundColor={hover() === "next" ? theme.backgroundElement : theme.backgroundPanel}
             >
               <text fg={theme.text}>

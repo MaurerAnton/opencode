@@ -1,0 +1,9 @@
+Take a screenshot of a web page using a headless browser. Returns the screenshot as an image attachment that can be analyzed by vision-capable models.
+
+Usage:
+- Provide a URL and the tool opens it in a headless browser
+- Returns a PNG screenshot as base64 data URL
+- Useful for reviewing UI changes, debugging layout issues, or inspecting web pages visually
+- Supports Chromium, Google Chrome, and Firefox (auto-detected)
+- Set window size via width/height parameters
+- Maximum wait time is 30 seconds for page load

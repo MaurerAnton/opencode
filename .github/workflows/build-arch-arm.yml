@@ -1,0 +1,77 @@
+name: Build Arch Linux ARM
+
+on:
+  push:
+    branches: [feature/arrow-key-session-switching]
+    paths:
+      - 'packages/opencode/**'
+      - 'packaging/arch/**'
+      - '.github/workflows/build-arch-arm.yml'
+  workflow_dispatch:
+
+jobs:
+  build-arch-arm:
+    runs-on: ubuntu-24.04-arm
+    env:
+      PKG_NAME: opencode
+      PKG_VER: 1.14.48
+      PKG_REL: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build CLI for linux-arm64
+        run: ./packages/opencode/script/build.ts --single --skip-embed-web-ui
+
+      - name: Install packaging tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libarchive-tools zstd
+
+      - name: Bundle Arch Linux package
+        run: |
+          BIN="packages/opencode/dist/opencode-linux-arm64/bin/opencode"
+          PKG="${PKG_NAME}-${PKG_VER}-${PKG_REL}-aarch64"
+          mkdir -p pkg/usr/bin pkg/usr/share/licenses/${PKG_NAME}
+          cp "$BIN" pkg/usr/bin/opencode
+          cp LICENSE pkg/usr/share/licenses/${PKG_NAME}/LICENSE
+
+          # .PKGINFO (Arch Linux package metadata)
+          cat > pkg/.PKGINFO << EOF
+          pkgname = ${PKG_NAME}
+          pkgver = ${PKG_VER}-${PKG_REL}
+          pkgdesc = AI-powered development tool
+          url = https://github.com/MaurerAnton/opencode
+          builddate = $(date -u +%s)
+          packager = MaurerAnton
+          size = $(du -sb pkg --exclude .PKGINFO --exclude .MTREE | cut -f1)
+          arch = aarch64
+          license = MIT
+          depend = glibc
+          EOF
+
+          # .MTREE (file manifest, optional but recommended)
+          cd pkg
+          bsdtar -czf .MTREE --format=mtree --options='!all,use-set,type,uid,gid,mode,time,size,md5,sha256,link' usr 2>/dev/null || true
+          cd ..
+
+          # Build final package
+          cd pkg
+          bsdtar -cf "../${PKG}.pkg.tar" .PKGINFO .MTREE usr 2>/dev/null
+          zstd -z "../${PKG}.pkg.tar" -o "../${PKG}.pkg.tar.zst" --rm
+          cd ..
+          rm -rf pkg
+
+          echo "Built: ${PKG}.pkg.tar.zst"
+          ls -lh ${PKG}.pkg.tar.zst
+
+      - name: Upload Arch Linux package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-arch-arm64
+          path: opencode-*.pkg.tar.zst
