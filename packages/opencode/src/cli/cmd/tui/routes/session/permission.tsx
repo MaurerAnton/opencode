@@ -18,7 +18,7 @@ import { useTuiConfig } from "../../context/tui-config"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
 
-type PermissionStage = "permission" | "always" | "reject"
+type PermissionStage = "permission" | "always" | "reject" | "custom"
 
 function filetype(input?: string) {
   if (!input) return "none"
@@ -405,12 +405,16 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
               title="Permission required"
               header={header()}
               body={current.body}
-              options={{ once: "Allow once", always: "Allow always", reject: "Reject" }}
+              options={{ once: "Allow once", always: "Allow always", custom: "Allow path...", reject: "Reject" }}
               escapeKey="reject"
               fullscreen
               onSelect={(option) => {
                 if (option === "always") {
                   setStore("stage", "always")
+                  return
+                }
+                if (option === "custom") {
+                  setStore("stage", "custom")
                   return
                 }
                 if (option === "reject") {
@@ -435,6 +439,67 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
           )
 
           return body
+        })()}
+      </Match>
+      <Match when={store.stage === "custom"}>
+        {(() => {
+          let input: TextareaRenderable
+          useBindings(() => ({
+            mode: OPENCODE_BASE_MODE,
+            bindings: [
+              { key: "escape", desc: "Cancel custom path", group: "Permission", cmd: () => setStore("stage", "permission") },
+              {
+                key: "return",
+                desc: "Confirm custom path",
+                group: "Permission",
+                cmd: () => {
+                  const p = input.plainText.trim()
+                  if (!p) return
+                  setStore("stage", "permission")
+                  void sdk.client.permission.reply({
+                    reply: "always",
+                    requestID: props.request.id,
+                    patterns: [p],
+                    workspace: project.workspace.current(),
+                  })
+                },
+              },
+            ],
+          }))
+          return (
+            <box
+              backgroundColor={theme.backgroundPanel}
+              border={["left"]}
+              borderColor={theme.primary}
+              customBorderChars={SplitBorder.customBorderChars}
+            >
+              <box gap={1} paddingLeft={1} paddingRight={3} paddingTop={1} paddingBottom={1}>
+                <box flexDirection="row" gap={1} paddingLeft={1}>
+                  <text fg={theme.warning}>{"△"}</text>
+                  <text fg={theme.text}>Allow custom path for <b>{props.request.permission}</b></text>
+                </box>
+                <box paddingLeft={3} gap={1}>
+                  <text fg={theme.textMuted}>Enter a path pattern to always allow:</text>
+                  <text fg={theme.textMuted} wrapMode="none">
+                    Examples: /tmp/*, /etc/os-release, ~/.config/*
+                  </text>
+                  <textarea
+                    ref={input!}
+                    fg={theme.text}
+                    bg={theme.backgroundElement}
+                    placeholder="/path/to/allow"
+                    singleLine={true}
+                  />
+                </box>
+                <box paddingLeft={3} flexDirection="row" gap={2}>
+                  <text fg={theme.text}>Enter</text>
+                  <text fg={theme.textMuted}>Allow forever</text>
+                  <text fg={theme.text}>· Esc</text>
+                  <text fg={theme.textMuted}>Cancel</text>
+                </box>
+              </box>
+            </box>
+          )
         })()}
       </Match>
     </Switch>

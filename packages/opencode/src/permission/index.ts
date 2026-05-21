@@ -50,6 +50,7 @@ export type Reply = Schema.Schema.Type<typeof Reply>
 const reply = {
   reply: Reply,
   message: Schema.optional(Schema.String),
+  patterns: Schema.optional(Schema.Array(Schema.String)),
 }
 
 export const ReplyBody = Schema.Struct(reply).annotate({ identifier: "PermissionReplyBody" })
@@ -106,6 +107,7 @@ export type AskInput = Schema.Schema.Type<typeof AskInput>
 export const ReplyInput = Schema.Struct({
   requestID: PermissionID,
   ...reply,
+  patterns: Schema.optional(Schema.Array(Schema.String)),
 }).annotate({ identifier: "PermissionReplyInput" })
 export type ReplyInput = Schema.Schema.Type<typeof ReplyInput>
 
@@ -123,6 +125,7 @@ interface PendingEntry {
 interface State {
   pending: Map<PermissionID, PendingEntry>
   approved: Ruleset
+  projectID: ProjectID
 }
 
 export function evaluate(permission: string, pattern: string, ...rulesets: Ruleset[]): Rule {
@@ -143,6 +146,7 @@ export const layer = Layer.effect(
         const state = {
           pending: new Map<PermissionID, PendingEntry>(),
           approved: row?.data ?? [],
+          projectID: ctx.project.id,
         }
 
         yield* Effect.addFinalizer(() =>
@@ -236,6 +240,29 @@ export const layer = Layer.effect(
           action: "allow",
         })
       }
+
+      if (input.patterns) {
+        for (const pattern of input.patterns) {
+          if (!approved.some((r) => r.permission === existing.info.permission && r.pattern === pattern)) {
+            approved.push({
+              permission: existing.info.permission,
+              pattern,
+              action: "allow",
+            })
+          }
+        }
+      }
+
+      const { projectID } = yield* InstanceState.get(state)
+      Database.use((db) =>
+        db
+          .insert(PermissionTable)
+          .values({ project_id: projectID, data: approved, time_created: Date.now(), time_updated: Date.now() })
+          .onConflictDoUpdate({
+            target: PermissionTable.project_id,
+            set: { data: approved, time_updated: Date.now() },
+          }),
+      )
 
       for (const [id, item] of pending.entries()) {
         if (item.info.sessionID !== existing.info.sessionID) continue
