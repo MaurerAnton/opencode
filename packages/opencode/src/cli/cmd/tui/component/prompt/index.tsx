@@ -22,6 +22,7 @@ import { useSDK } from "@tui/context/sdk"
 import { useRoute } from "@tui/context/route"
 import { useProject } from "@tui/context/project"
 import { useSync } from "@tui/context/sync"
+import { useSyncV2 } from "@tui/context/sync-v2"
 import { useEvent } from "@tui/context/event"
 import { editorSelectionKey, useEditorContext, type EditorSelection } from "@tui/context/editor"
 import { MessageID, PartID } from "@/session/schema"
@@ -146,10 +147,24 @@ export function Prompt(props: PromptProps) {
   const route = useRoute()
   const project = useProject()
   const sync = useSync()
+  const syncV2 = useSyncV2()
   const tuiConfig = useTuiConfig()
   const dialog = useDialog()
   const toast = useToast()
   const status = createMemo(() => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" })
+
+  const [streamTick, setStreamTick] = createSignal(0)
+  const streamTimer = setInterval(() => setStreamTick((t) => t + 1), 1000)
+  onCleanup(() => clearInterval(streamTimer))
+
+  const streamingActivity = createMemo(() => {
+    streamTick()
+    const last = syncV2.data.last_delta_at[props.sessionID ?? ""]
+    if (!last) return
+    const ago = ((Date.now() - last) / 1000) | 0
+    if (status().type === "busy" && ago > 5) return { stale: true, ago }
+    if (status().type === "busy") return { streaming: true }
+  })
   const history = usePromptHistory()
   const stash = usePromptStash()
   const command = useCommandPalette()
@@ -1635,13 +1650,23 @@ export function Prompt(props: PromptProps) {
                 flexGrow={1}
                 justifyContent={status().type === "retry" ? "space-between" : "flex-start"}
               >
-                <box flexShrink={0} flexDirection="row" gap={1}>
-                  <box marginLeft={1}>
-                    <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
-                      <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
+                  <box flexShrink={0} flexDirection="row" gap={1}>
+                    <box marginLeft={1}>
+                      <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
+                        <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
+                      </Show>
+                    </box>
+                    <Show when={streamingActivity()}>
+                      {(a) => (
+                        <text
+                          fg={a().stale ? theme.error : theme.textMuted}
+                          wrapMode="none"
+                        >
+                          {a().stale ? `⚠ ${a().ago}s no data` : "streaming"}
+                        </text>
+                      )}
                     </Show>
-                  </box>
-                  <box flexDirection="row" gap={1} flexShrink={0}>
+                    <box flexDirection="row" gap={1} flexShrink={0}>
                     {(() => {
                       const retry = createMemo(() => {
                         const s = status()

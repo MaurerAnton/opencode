@@ -54,8 +54,12 @@ export const { use: useSyncV2, provider: SyncProviderV2 } = createSimpleContext(
       messages: {
         [sessionID: string]: SessionMessage[]
       }
+      last_delta_at: {
+        [sessionID: string]: number
+      }
     }>({
       messages: {},
+      last_delta_at: {},
     })
 
     const event = useEvent()
@@ -162,6 +166,7 @@ export const { use: useSyncV2, provider: SyncProviderV2 } = createSimpleContext(
             const match = latestText(activeAssistant(draft))
             if (match) match.text += event.properties.delta
           })
+          setStore("last_delta_at", event.properties.sessionID, event.properties.timestamp)
           break
         case "session.next.text.ended":
           update(event.properties.sessionID, (draft) => {
