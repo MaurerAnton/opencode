@@ -1220,6 +1220,9 @@ export function Session() {
                 scrollAcceleration={scrollAcceleration()}
               >
                 <box height={1} />
+                <Show when={sync.data.message[route.sessionID] === undefined}>
+                  <text fg={theme.textMuted} paddingLeft={3}>Loading messages...</text>
+                </Show>
                 <For each={messages()}>
                   {(message, index) => (
                     <Switch>

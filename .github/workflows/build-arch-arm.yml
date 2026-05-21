@@ -2,7 +2,7 @@ name: Build Arch Linux ARM
 
 on:
   push:
-    branches: [feature/arrow-key-session-switching]
+    branches: [feature/arrow-key-session-switching, feature/arrow-key-session-switching-v2]
     paths:
       - 'packages/opencode/**'
       - 'packaging/arch/**'
