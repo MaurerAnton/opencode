@@ -1,25 +1,26 @@
 # Maintainer: MaurerAnton <open-code@maurer.pw>
-# Contributor: opencode
 pkgname=opencode-bin
-pkgver=1.14.48
+pkgver=1.15.6
 pkgrel=1
-pkgdesc="AI-powered development tool"
+pkgdesc="AI-powered development tool (fork — tabs, Node.js, permissions, browser)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/anomalyco/opencode"
+url="https://github.com/MaurerAnton/opencode"
 license=('MIT')
 depends=('glibc')
+provides=('opencode')
+conflicts=('opencode')
 
-_arch_map() {
+_arch_name() {
   case "${CARCH}" in
-    x86_64) echo "x64" ;;
-    aarch64) echo "arm64" ;;
+    x86_64) echo "x86_64" ;;
+    aarch64) echo "aarch64" ;;
   esac
 }
 
-source=("https://github.com/MaurerAnton/opencode/releases/download/v${pkgver}/opencode-linux-$(_arch_map).tar.gz")
+source=("https://github.com/MaurerAnton/opencode/releases/download/v${pkgver}-fork/opencode-1.14.48-1-$(_arch_name).pkg.tar.zst")
 sha256sums=('SKIP')
 
 package() {
-  install -Dm755 "${srcdir}/opencode" "${pkgdir}/usr/bin/opencode"
-  install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm755 "${srcdir}/usr/bin/opencode" "${pkgdir}/usr/bin/opencode"
+  install -Dm644 "${srcdir}/usr/share/licenses/opencode/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }
