@@ -86,7 +86,12 @@ jobs:
         if: needs.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_KEY || secrets.GPG_PRIVATE_KEY || secrets.GPG_SIGNING_KEY || secrets.SIGNING_KEY || secrets.GPG_SECRET }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE || secrets.GPG_KEY_PASSPHRASE || secrets.GPG_PASSWORD }}
         run: |
+          if [ -n "$GPG_PRIVATE_KEY" ]; then
+            echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --import --batch
+          fi
           gh release upload "v${{ needs.version.outputs.version }}" \
             packages/opencode/dist/opencode-linux-*.tar.gz \
             packages/opencode/dist/opencode-linux-*.pkg.tar.zst \
