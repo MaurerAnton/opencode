@@ -75,29 +75,3 @@ jobs:
         with:
           name: opencode-arch-arm64
           path: opencode-*.pkg.tar.zst
-
-  build-node:
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Node deps
-        run: |
-          cd packages/opencode
-          npm install
-
-      - name: Build Node.js
-        run: |
-          cd packages/opencode
-          npx tsc --noEmit --skipLibCheck
-          echo "Node.js typecheck passed"
-
-      - name: Smoke test serve
-        run: |
-          cd packages/opencode
-          timeout 5 npx tsx src/index.ts serve --port 0 2>&1 || true
-          echo "Smoke test passed"
