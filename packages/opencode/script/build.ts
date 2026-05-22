@@ -237,7 +237,8 @@ if (Script.release) {
   const archives = (await Array.fromAsync(new Bun.Glob("*.tar.gz").scan({ cwd: "dist" })))
     .map((f) => `./dist/${f}`)
   if (archives.length > 0) {
-    await $`gh release upload v${Script.version} ${archives} --clobber --repo ${process.env.GH_REPO}`
+    await $`sha256sum ./dist/*.tar.gz > ./dist/SHA256SUMS`
+    await $`gh release upload v${Script.version} ./dist/SHA256SUMS ${archives} --clobber --repo ${process.env.GH_REPO}`
   }
 }
 
