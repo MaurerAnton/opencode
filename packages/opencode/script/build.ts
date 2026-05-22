@@ -80,87 +80,43 @@ const createEmbeddedWebUIBundle = async () => {
 
 const embeddedFileMap = skipEmbedWebUi ? null : await createEmbeddedWebUIBundle()
 
+// 3 CPU targets supported by Bun:
+//   arm64         — ARM v8.0+, NEON always
+//   x64           — x86_64, AVX2 (Haswell 2013+)
+//   x64-baseline  — x86_64, SSE4.2 only (Nehalem 2008+), no AVX2
+type Cpu = "arm64" | "x64" | "x64-baseline"
+type Variant = "hard" | "soft"
+
 const allTargets: {
-  os: string
-  arch: "arm64" | "x64"
+  os: "linux"
+  cpu: Cpu
   abi?: "musl"
-  avx2?: false
+  variant: Variant
 }[] = [
-  {
-    os: "linux",
-    arch: "arm64",
-  },
-  {
-    os: "linux",
-    arch: "x64",
-  },
-  {
-    os: "linux",
-    arch: "x64",
-    avx2: false,
-  },
-  {
-    os: "linux",
-    arch: "arm64",
-    abi: "musl",
-  },
-  {
-    os: "linux",
-    arch: "x64",
-    abi: "musl",
-  },
-  {
-    os: "linux",
-    arch: "x64",
-    abi: "musl",
-    avx2: false,
-  },
-  {
-    os: "darwin",
-    arch: "arm64",
-  },
-  {
-    os: "darwin",
-    arch: "x64",
-  },
-  {
-    os: "darwin",
-    arch: "x64",
-    avx2: false,
-  },
-  {
-    os: "win32",
-    arch: "arm64",
-  },
-  {
-    os: "win32",
-    arch: "x64",
-  },
-  {
-    os: "win32",
-    arch: "x64",
-    avx2: false,
-  },
+  // arm64 × glibc
+  { os: "linux", cpu: "arm64", variant: "hard" },
+  { os: "linux", cpu: "arm64", variant: "soft" },
+  // arm64 × musl
+  { os: "linux", cpu: "arm64", abi: "musl", variant: "hard" },
+  { os: "linux", cpu: "arm64", abi: "musl", variant: "soft" },
+  // x64 (AVX2) × glibc
+  { os: "linux", cpu: "x64", variant: "hard" },
+  { os: "linux", cpu: "x64", variant: "soft" },
+  // x64 (AVX2) × musl
+  { os: "linux", cpu: "x64", abi: "musl", variant: "hard" },
+  { os: "linux", cpu: "x64", abi: "musl", variant: "soft" },
+  // x64-baseline (SSE4.2) × glibc
+  { os: "linux", cpu: "x64-baseline", variant: "hard" },
+  { os: "linux", cpu: "x64-baseline", variant: "soft" },
+  // x64-baseline (SSE4.2) × musl
+  { os: "linux", cpu: "x64-baseline", abi: "musl", variant: "hard" },
+  { os: "linux", cpu: "x64-baseline", abi: "musl", variant: "soft" },
 ]
 
 const targets = singleFlag
   ? allTargets.filter((item) => {
-      if (item.os !== process.platform || item.arch !== process.arch) {
-        return false
-      }
-
-      // When building for the current platform, prefer a single native binary by default.
-      // Baseline binaries require additional Bun artifacts and can be flaky to download.
-      if (item.avx2 === false) {
-        return baselineFlag
-      }
-
-      // also skip abi-specific builds for the same reason
-      if (item.abi !== undefined) {
-        return false
-      }
-
-      return true
+      const currentCpu: Cpu = process.arch === "arm64" ? "arm64" : baselineFlag ? "x64-baseline" : "x64"
+      return item.cpu === currentCpu && item.abi === undefined && item.variant === "hard"
     })
   : allTargets
 
@@ -172,13 +128,16 @@ if (!skipInstall) {
   await $`bun install --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
 }
 for (const item of targets) {
+  // cpu: "arm64" | "x64" | "x64-baseline" → arch: "arm64" | "x64", baseline: true/false
+  const baseline = item.cpu === "x64-baseline"
+  const arch = baseline ? "x64" : item.cpu
+
   const name = [
     pkg.name,
-    // changing to win32 flags npm for some reason
-    item.os === "win32" ? "windows" : item.os,
-    item.arch,
-    item.avx2 === false ? "baseline" : undefined,
-    item.abi === undefined ? undefined : item.abi,
+    "linux",
+    item.cpu,
+    item.abi,
+    item.variant,
   ]
     .filter(Boolean)
     .join("-")
@@ -190,9 +149,19 @@ for (const item of targets) {
   const parserWorker = fs.realpathSync(fs.existsSync(localPath) ? localPath : rootPath)
   const workerPath = "./src/cli/cmd/tui/worker.ts"
 
-  // Use platform-specific bunfs root path based on target OS
-  const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
+  const bunfsRoot = "/$bunfs/root/"
   const workerRelativePath = path.relative(dir, parserWorker).replaceAll("\\", "/")
+
+  // Bun compile target: bun-linux-{arch}[-baseline][-musl]
+  const bunTarget = [
+    "bun",
+    item.os,
+    arch,
+    baseline ? "baseline" : undefined,
+    item.abi,
+  ]
+    .filter(Boolean)
+    .join("-")
 
   await Bun.build({
     conditions: ["browser"],
@@ -200,7 +169,7 @@ for (const item of targets) {
     plugins: [plugin],
     external: ["node-gyp"],
     format: "esm",
-    minify: true,
+    minify: item.variant === "hard",
     sourcemap: sourcemapsFlag ? "linked" : "none",
     splitting: true,
     compile: {
@@ -208,7 +177,7 @@ for (const item of targets) {
       autoloadDotenv: false,
       autoloadTsconfig: true,
       autoloadPackageJson: true,
-      target: name.replace(pkg.name, "bun") as any,
+      target: bunTarget as any,
       outfile: `dist/${name}/bin/opencode`,
       execArgv: [`--user-agent=opencode/${Script.version}`, "--use-system-ca", "--"],
       windows: {},
@@ -222,12 +191,14 @@ for (const item of targets) {
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
-      OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
+      OPENCODE_LIBC: `'${item.abi ?? "glibc"}'`,
+      OPENCODE_VARIANT: `'${item.variant}'`,
+      OPENCODE_CPU: `'${item.cpu}'`,
     },
   })
 
   // Smoke test: only run if binary is for current platform
-  if (item.os === process.platform && item.arch === process.arch && !item.abi) {
+  if (arch === process.arch && !item.abi) {
     const binaryPath = `dist/${name}/bin/opencode`
     console.log(`Running smoke test: ${binaryPath} --version`)
     try {
@@ -246,8 +217,11 @@ for (const item of targets) {
         name,
         version: Script.version,
         preferUnplugged: true,
-        os: [item.os],
-        cpu: [item.arch],
+        os: ["linux"],
+        cpu: [arch],
+        libc: [item.abi ?? "glibc"],
+        variant: item.variant,
+        baseline,
       },
       null,
       2,
