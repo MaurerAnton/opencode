@@ -126,4 +126,112 @@ If you are working on a project that's related to OpenCode and is using "opencod
 
 ---
 
+### Building from Source
+
+OpenCode can run on two runtimes: **Bun** (default, includes TUI) and **Node.js** (headless/server-only). Choose based on your needs.
+
+#### Prerequisites
+
+| Dependency | Bun build | Node.js build |
+|---|---|---|
+| git | required | required |
+| Bun ≥ 1.2 | required | not needed |
+| Node.js ≥ 22.12 | not needed | required |
+| better-sqlite3 | not needed | required (auto-installed by npm) |
+| C++ build tools | for better-sqlite3 | for better-sqlite3 |
+
+#### Clone & Install
+
+```bash
+git clone https://github.com/anomalyco/opencode.git
+cd opencode/packages/opencode
+```
+
+#### Bun Build (TUI + Server + CLI)
+
+```bash
+# Build standalone binary (outputs dist/opencode-<platform>/bin/opencode)
+bun run script/build.ts
+
+# For CPUs without AVX2 (Core 2 Duo, Athlon, Pentium):
+bun run script/build.ts --baseline
+```
+
+#### Node.js Build (Server + CLI, no TUI)
+
+First install Node.js if needed. On older CPUs (Core 2 Duo), build from source:
+
+```bash
+# Download Node.js source
+curl -O https://nodejs.org/dist/v22.14.0/node-v22.14.0.tar.xz
+tar xf node-v22.14.0.tar.xz
+cd node-v22.14.0
+
+# Configure for Core 2 Duo (SSE4.1, no AVX)
+./configure \
+  --without-npm \
+  --without-corepack \
+  --enable-optimized-for-Core2 \
+  --with-intl=none
+
+make -j$(nproc)          # ~20 min on Core 2 Duo
+sudo make install
+```
+
+Install opencode dependencies and run:
+
+```bash
+cd packages/opencode
+npm install               # installs tsx, better-sqlite3, drizzle-orm
+npm install -g tsx        # optional: install tsx globally
+
+# Run server (headless)
+npx tsx src/index.ts serve --hostname 127.0.0.1 --port 4096
+
+# Run CLI commands
+npx tsx src/index.ts run "explain this codebase"
+npx tsx src/index.ts export <sessionID>
+```
+
+#### Full Build Pipeline (Bun + Node.js combined)
+
+For release packaging that includes both runtimes:
+
+```bash
+cd packages/opencode
+
+# 1. Bun standalone binary
+bun run script/build.ts --baseline    # skip --baseline if CPU supports AVX2
+
+# 2. TypeScript compile for Node.js
+npx tsc --skipLibCheck --outDir dist/node --rootDir src \
+  --module node16 --target es2022 --moduleResolution node16 \
+  --esModuleInterop
+
+# 3. Arch Linux package (requires libarchive-tools, zstd)
+BIN="dist/opencode-linux-x64-baseline/bin/opencode" \
+PKG="opencode-$(node -p 'require("./package.json").version')" \
+  mkdir -p pkg/usr/bin && cp "$BIN" pkg/usr/bin/opencode && \
+  bsdtar -cf "$PKG.pkg.tar" -C pkg . && zstd -z "$PKG.pkg.tar" -o "$PKG.pkg.tar.zst" --rm
+```
+
+#### Platform-Specific Notes
+
+**Linux x86_64 (Core 2 Duo / no AVX2)**:
+- Use `--baseline` flag when building with Bun (skips AVX2-only optimizations)
+- Build Node.js with `--enable-optimized-for-Core2`
+- Set `-j2` for `make` (Core 2 Duo has 2 cores)
+
+**Linux aarch64 (ARM, e.g. Raspberry Pi 5)**:
+- Builds natively — no special flags needed
+- better-sqlite3 compiles from source via node-gyp
+- For very low-memory devices (≤2GB RAM), prefer Node.js headless build
+
+**macOS**:
+- Xcode Command Line Tools required (`xcode-select --install`)
+- ARM Macs: native `aarch64` build
+- Intel Macs: supports `--baseline` for older CPUs
+
+---
+
 **Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
