@@ -1,3 +1,4 @@
+# force re-parse
 name: publish
 run-name: "${{ format('release {0}', inputs.bump) }}"
 
