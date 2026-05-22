@@ -6,6 +6,9 @@ on:
     inputs:
       bump: {description: bump, required: false, type: choice, options: [patch]}
 
+permissions:
+  contents: write
+
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
@@ -21,9 +24,13 @@ jobs:
           echo "version=$V" >> $GITHUB_OUTPUT
           echo "release=true" >> $GITHUB_OUTPUT
           echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
-          gh release create "v$V" --title "v$V" --generate-notes --repo "${{ github.repository }}" || true
-        env: {GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
-    outputs: {version: "${{ steps.version.outputs.version }}", release: "${{ steps.version.outputs.release }}", repo: "${{ steps.version.outputs.repo }}"}
+          gh release create "v$V" --title "v$V" --generate-notes --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+      repo: ${{ steps.version.outputs.repo }}
 
   build-cli:
     needs: version
@@ -33,14 +40,87 @@ jobs:
         with: {fetch-tags: true}
       - uses: ./.github/actions/setup-bun
       - name: Build
-        run: ./packages/opencode/script/build.ts --skip-embed-web-ui
+        run: ./packages/opencode/script/build.ts
         env:
-          OPENCODE_VERSION: "${{ needs.version.outputs.version }}"
-          OPENCODE_RELEASE: "${{ needs.version.outputs.release }}"
-          GH_REPO: "${{ needs.version.outputs.repo }}"
-          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-          GPG_PRIVATE_KEY: "${{ secrets.GPG_KEY || secrets.GPG_PRIVATE_KEY || secrets.GPG_SIGNING_KEY || secrets.SIGNING_KEY || secrets.GPG_SECRET }}"
-          GPG_PASSPHRASE: "${{ secrets.GPG_PASSPHRASE || secrets.GPG_KEY_PASSPHRASE || secrets.GPG_PASSWORD }}"
+          OPENCODE_VERSION: ${{ needs.version.outputs.version }}
+          OPENCODE_RELEASE: ${{ needs.version.outputs.release }}
+          GH_REPO: ${{ needs.version.outputs.repo }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_KEY || secrets.GPG_PRIVATE_KEY || secrets.GPG_SIGNING_KEY || secrets.SIGNING_KEY || secrets.GPG_SECRET }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE || secrets.GPG_KEY_PASSPHRASE || secrets.GPG_PASSWORD }}
       - uses: actions/upload-artifact@v4
-        with: {name: opencode-cli, path: packages/opencode/dist/opencode-linux*}
-    outputs: {version: "${{ needs.version.outputs.version }}"}
+        with:
+          name: opencode-cli
+          path: packages/opencode/dist/opencode-linux*
+
+  package-cli:
+    needs: [build-cli, version]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: opencode-cli
+          path: packages/opencode/dist
+      - name: Package
+        working-directory: packages/opencode/dist
+        run: |
+          set -e
+          V="${{ needs.version.outputs.version }}"
+          for dir in opencode-linux-*; do
+            if [ -d "$dir" ]; then
+              echo "Packaging $dir"
+              tar -czf "${dir}.tar.gz" -C "$dir" bin/
+              CPU=$(echo "$dir" | sed 's/opencode-linux-//' | cut -d- -f1)
+              case "$CPU" in x64|x64-baseline) ARCH="x86_64" ;; arm64) ARCH="aarch64" ;; esac
+              PKG="${dir}.pkg"
+              mkdir -p "$PKG/usr/bin"
+              cp "$dir/bin/opencode" "$PKG/usr/bin/opencode"
+              cat > "$PKG/.PKGINFO" << PKGEOF
+pkgname = opencode
+pkgver = $V
+pkgdesc = OpenCode AI CLI tool (TUI) - $CPU
+arch = $ARCH
+url = https://github.com/MaurerAnton/opencode
+license = MIT
+PKGEOF
+              tar -cf - -C "$PKG" .PKGINFO usr | zstd -T0 -o "${dir}.pkg.tar.zst"
+              rm -rf "$PKG"
+            fi
+          done
+      - name: Upload to release
+        if: needs.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "v${{ needs.version.outputs.version }}" \
+            packages/opencode/dist/opencode-linux-*.tar.gz \
+            packages/opencode/dist/opencode-linux-*.pkg.tar.zst \
+            --clobber --repo "${{ needs.version.outputs.repo }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opencode-cli-archives
+          path: |
+            packages/opencode/dist/opencode-linux-*.tar.gz
+            packages/opencode/dist/opencode-linux-*.pkg.tar.zst
+
+  publish:
+    needs: [version, build-cli, package-cli]
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: opencode-cli-archives
+          path: packages/opencode/dist
+      - name: Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** ${{ needs.version.outputs.release }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Packages" >> $GITHUB_STEP_SUMMARY
+          ls packages/opencode/dist/opencode-linux-*.tar.gz packages/opencode/dist/opencode-linux-*.pkg.tar.zst 2>/dev/null | while read f; do
+            echo "- $(basename "$f")" >> $GITHUB_STEP_SUMMARY
+          done
