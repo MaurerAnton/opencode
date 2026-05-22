@@ -248,7 +248,9 @@ if (Script.release) {
         ? ["--batch", "--passphrase", gpgPass, "--pinentry-mode", "loopback"]
         : ["--batch", "--no-tty"]
       await $`gpg ${{ raw: gpgArgs.join(" ") }} --detach-sign --armor ./dist/SHA256SUMS`
-      await $`gh release upload v${Script.version} ./dist/SHA256SUMS.asc ${archives} ./dist/SHA256SUMS --clobber --repo ${process.env.GH_REPO}`
+      const keyId = "A60A064DF02C3602"
+      await $`gpg ${{ raw: gpgArgs.join(" ") }} --export --armor ${keyId} > ./dist/opencode-signing-key.asc`.nothrow()
+      await $`gh release upload v${Script.version} ./dist/SHA256SUMS.asc ./dist/opencode-signing-key.asc ${archives} ./dist/SHA256SUMS --clobber --repo ${process.env.GH_REPO}`
     } else {
       await $`gh release upload v${Script.version} ./dist/SHA256SUMS ${archives} --clobber --repo ${process.env.GH_REPO}`
     }
