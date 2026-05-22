@@ -242,10 +242,11 @@ if (Script.release) {
     const gpgPass = process.env.GPG_PASSPHRASE
     if (gpgKey) {
       console.log("Signing SHA256SUMS with GPG...")
+      const decoded = Buffer.from(gpgKey, "base64").toString()
+      await $`echo $decoded | gpg --import --batch`.env({ decoded }).nothrow()
       const gpgArgs = gpgPass
         ? ["--batch", "--passphrase", gpgPass, "--pinentry-mode", "loopback"]
         : ["--batch", "--no-tty"]
-      await $`gpg --import --batch <(echo "$GPG_PRIVATE_KEY")`.env({ GPG_PRIVATE_KEY: gpgKey }).nothrow()
       await $`gpg ${{ raw: gpgArgs.join(" ") }} --detach-sign --armor ./dist/SHA256SUMS`
       await $`gh release upload v${Script.version} ./dist/SHA256SUMS.asc ${archives} ./dist/SHA256SUMS --clobber --repo ${process.env.GH_REPO}`
     } else {
