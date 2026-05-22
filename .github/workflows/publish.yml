@@ -111,10 +111,31 @@ jobs:
         working-directory: packages/opencode/dist
         run: |
           set -e
+          VERSION="${{ needs.version.outputs.version }}"
           for dir in opencode-linux-*; do
             if [ -d "$dir" ]; then
               echo "Packaging $dir"
               tar -czf "${dir}.tar.gz" -C "$dir" bin/
+
+              # Build pacman package (.pkg.tar.zst)
+              CPU=$(echo "$dir" | sed 's/opencode-linux-//' | cut -d- -f1)
+              case "$CPU" in
+                x64|x64-baseline) ARCH="x86_64" ;;
+                arm64) ARCH="aarch64" ;;
+              esac
+              PKG="${dir}.pkg"
+              mkdir -p "$PKG/usr/bin"
+              cp "$dir/bin/opencode" "$PKG/usr/bin/opencode"
+              cat > "$PKG/.PKGINFO" << EOF
+pkgname = opencode
+pkgver = $VERSION
+pkgdesc = OpenCode AI CLI tool (TUI) — $CPU $dir
+arch = $ARCH
+url = https://github.com/MaurerAnton/opencode
+license = MIT
+EOF
+              tar -cf - -C "$PKG" .PKGINFO usr | zstd -T0 -o "${dir}.pkg.tar.zst"
+              rm -rf "$PKG"
             fi
           done
 
@@ -125,13 +146,16 @@ jobs:
         run: |
           gh release upload "v${{ needs.version.outputs.version }}" \
             packages/opencode/dist/opencode-linux-*.tar.gz \
+            packages/opencode/dist/opencode-linux-*.pkg.tar.zst \
             --clobber \
             --repo "${{ needs.version.outputs.repo }}"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: opencode-cli-archives
-          path: packages/opencode/dist/opencode-linux-*.tar.gz
+          path: |
+            packages/opencode/dist/opencode-linux-*.tar.gz
+            packages/opencode/dist/opencode-linux-*.pkg.tar.zst
 
   build-electron:
     needs:
@@ -357,6 +381,7 @@ jobs:
         run: |
           gh release upload "v${{ needs.version.outputs.version }}" \
             packages/opencode/dist/opencode-linux-*.tar.gz \
+            packages/opencode/dist/opencode-linux-*.pkg.tar.zst \
             --clobber \
             --repo "${{ needs.version.outputs.repo }}"
 
