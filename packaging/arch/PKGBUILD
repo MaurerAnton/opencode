@@ -17,7 +17,7 @@ _arch_name() {
   esac
 }
 
-source=("https://github.com/MaurerAnton/opencode/releases/download/v${pkgver}-fork/opencode-1.14.48-1-$(_arch_name).pkg.tar.zst")
+source=("https://github.com/MaurerAnton/opencode/releases/download/v${pkgver}-fork/opencode-${pkgver}-1-$(_arch_name).pkg.tar.zst")
 sha256sums=('SKIP')
 
 package() {

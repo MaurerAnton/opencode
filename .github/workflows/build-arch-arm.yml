@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     env:
       PKG_NAME: opencode
-      PKG_VER: 1.14.48
+      PKG_VER: 1.15.6
       PKG_REL: 1
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PKG_NAME: opencode
-      PKG_VER: 1.14.48
+      PKG_VER: 1.15.6
       PKG_REL: 1
     steps:
       - uses: actions/checkout@v4
