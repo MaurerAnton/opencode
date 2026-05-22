@@ -84,7 +84,7 @@ jobs:
               cp "$dir/bin/opencode" "$PKG/usr/bin/opencode"
               printf 'pkgname = opencode\npkgver = %s\npkgdesc = OpenCode AI CLI tool (TUI) - %s\narch = %s\nurl = https://github.com/MaurerAnton/opencode\nlicense = MIT\n' "$V" "$CPU" "$ARCH" > "$PKG/.PKGINFO"
               tar -cf - -C "$PKG" .PKGINFO usr | zstd -T0 -o "${dir}.pkg.tar.zst"
-              gpg --batch --no-tty --detach-sign --armor -o "${dir}.pkg.tar.zst.sig" "${dir}.pkg.tar.zst"
+              gpg --batch --no-tty --detach-sign -o "${dir}.pkg.tar.zst.sig" "${dir}.pkg.tar.zst"
               rm -rf "$PKG"
             fi
           done
