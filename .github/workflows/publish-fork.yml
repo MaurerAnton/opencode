@@ -6,15 +6,41 @@ on:
     inputs:
       bump: {description: bump, required: false, type: choice, options: [patch]}
 
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
   version:
     runs-on: ubuntu-24.04
     steps:
-      - run: |
-          echo "version=0.0.0-test" >> $GITHUB_OUTPUT
-          echo "release=false" >> $GITHUB_OUTPUT
-          echo "repo=MaurerAnton/opencode" >> $GITHUB_OUTPUT
-    outputs:
-      version: ${{ steps.version.outputs.version || '0.0.0' }}
-      release: ${{ steps.version.outputs.release || 'false' }}
-      repo: ${{ steps.version.outputs.repo || '' }}
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: ./.github/actions/setup-bun
+      - id: version
+        run: |
+          V="0.0.0-$(date +%Y%m%d%H%M)"
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "release=true" >> $GITHUB_OUTPUT
+          echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+          gh release create "v$V" --title "v$V" --generate-notes --repo "${{ github.repository }}" || true
+        env: {GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+    outputs: {version: "${{ steps.version.outputs.version }}", release: "${{ steps.version.outputs.release }}", repo: "${{ steps.version.outputs.repo }}"}
+
+  build-cli:
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-tags: true}
+      - uses: ./.github/actions/setup-bun
+      - name: Build
+        run: ./packages/opencode/script/build.ts --skip-embed-web-ui
+        env:
+          OPENCODE_VERSION: "${{ needs.version.outputs.version }}"
+          OPENCODE_RELEASE: "${{ needs.version.outputs.release }}"
+          GH_REPO: "${{ needs.version.outputs.repo }}"
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GPG_PRIVATE_KEY: "${{ secrets.GPG_KEY || secrets.GPG_PRIVATE_KEY || secrets.GPG_SIGNING_KEY || secrets.SIGNING_KEY || secrets.GPG_SECRET }}"
+          GPG_PASSPHRASE: "${{ secrets.GPG_PASSPHRASE || secrets.GPG_KEY_PASSPHRASE || secrets.GPG_PASSWORD }}"
+      - uses: actions/upload-artifact@v4
+        with: {name: opencode-cli, path: packages/opencode/dist/opencode-linux*}
+    outputs: {version: "${{ needs.version.outputs.version }}"}
