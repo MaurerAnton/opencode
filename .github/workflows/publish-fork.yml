@@ -78,6 +78,7 @@ jobs:
               cp "$dir/bin/opencode" "$PKG/usr/bin/opencode"
               printf 'pkgname = opencode\npkgver = %s\npkgdesc = OpenCode AI CLI tool (TUI) - %s\narch = %s\nurl = https://github.com/MaurerAnton/opencode\nlicense = MIT\n' "$V" "$CPU" "$ARCH" > "$PKG/.PKGINFO"
               tar -cf - -C "$PKG" .PKGINFO usr | zstd -T0 -o "${dir}.pkg.tar.zst"
+              gpg --batch --no-tty --detach-sign --armor -o "${dir}.pkg.tar.zst.sig" "${dir}.pkg.tar.zst"
               rm -rf "$PKG"
             fi
           done
@@ -89,6 +90,7 @@ jobs:
           gh release upload "v${{ needs.version.outputs.version }}" \
             packages/opencode/dist/opencode-linux-*.tar.gz \
             packages/opencode/dist/opencode-linux-*.pkg.tar.zst \
+            packages/opencode/dist/opencode-linux-*.pkg.tar.zst.sig \
             --clobber --repo "${{ needs.version.outputs.repo }}"
       - uses: actions/upload-artifact@v4
         with:
