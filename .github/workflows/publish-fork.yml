@@ -76,14 +76,7 @@ jobs:
               PKG="${dir}.pkg"
               mkdir -p "$PKG/usr/bin"
               cp "$dir/bin/opencode" "$PKG/usr/bin/opencode"
-              cat > "$PKG/.PKGINFO" << PKGEOF
-pkgname = opencode
-pkgver = $V
-pkgdesc = OpenCode AI CLI tool (TUI) - $CPU
-arch = $ARCH
-url = https://github.com/MaurerAnton/opencode
-license = MIT
-PKGEOF
+              printf 'pkgname = opencode\npkgver = %s\npkgdesc = OpenCode AI CLI tool (TUI) - %s\narch = %s\nurl = https://github.com/MaurerAnton/opencode\nlicense = MIT\n' "$V" "$CPU" "$ARCH" > "$PKG/.PKGINFO"
               tar -cf - -C "$PKG" .PKGINFO usr | zstd -T0 -o "${dir}.pkg.tar.zst"
               rm -rf "$PKG"
             fi
