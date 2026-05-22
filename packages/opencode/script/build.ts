@@ -238,7 +238,19 @@ if (Script.release) {
     .map((f) => `./dist/${f}`)
   if (archives.length > 0) {
     await $`sha256sum ./dist/*.tar.gz > ./dist/SHA256SUMS`
-    await $`gh release upload v${Script.version} ./dist/SHA256SUMS ${archives} --clobber --repo ${process.env.GH_REPO}`
+    const gpgKey = process.env.GPG_PRIVATE_KEY
+    const gpgPass = process.env.GPG_PASSPHRASE
+    if (gpgKey) {
+      console.log("Signing SHA256SUMS with GPG...")
+      const gpgArgs = gpgPass
+        ? ["--batch", "--passphrase", gpgPass, "--pinentry-mode", "loopback"]
+        : ["--batch", "--no-tty"]
+      await $`gpg --import --batch <(echo "$GPG_PRIVATE_KEY")`.env({ GPG_PRIVATE_KEY: gpgKey }).nothrow()
+      await $`gpg ${{ raw: gpgArgs.join(" ") }} --detach-sign --armor ./dist/SHA256SUMS`
+      await $`gh release upload v${Script.version} ./dist/SHA256SUMS.asc ${archives} ./dist/SHA256SUMS --clobber --repo ${process.env.GH_REPO}`
+    } else {
+      await $`gh release upload v${Script.version} ./dist/SHA256SUMS ${archives} --clobber --repo ${process.env.GH_REPO}`
+    }
   }
 }
 
